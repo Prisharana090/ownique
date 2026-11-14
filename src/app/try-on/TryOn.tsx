@@ -3,7 +3,7 @@
 // Upload a product photo, place the design (drag, resize, rotate, perspective corners), then Create Preview.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { renderMockup, type Blend, type Pt } from "@/lib/mockup";
+import { maskCanvas, renderMockup, type Blend, type Pt } from "@/lib/mockup";
 import { DEFAULT_COLORS, customizeArt, isCustomized, type ColorSettings } from "@/lib/artColor";
 import DesignColors from "./DesignColors";
 
@@ -49,7 +49,11 @@ export default function TryOn() {
   const [aiError, setAiError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const drag = useRef<{ mode: "move" | "corner" | "rotate" | "resize"; i?: number; p0: Pt; s0: Place } | null>(null);
+  const drag = useRef<{ mode: "move" | "corner" | "rotate" | "resize" | "vertex"; i?: number; p0: Pt; s0: Place } | null>(null);
+  // Print area: an outline of the product surface (photo pixels). The design is clipped to it everywhere.
+  const [area, setArea] = useState<Pt[]>([]);
+  const [areaMode, setAreaMode] = useState<"off" | "draw" | "edit">("off");
+  const mask = (k: number) => (area.length >= 3 && areaMode !== "draw" ? area.map((p) => ({ x: p.x * k, y: p.y * k })) : undefined);
 
   // Designs list; carry over ?design= from the design page.
   useEffect(() => {
@@ -101,13 +105,14 @@ export default function TryOn() {
       const k = (boxW * (window.devicePixelRatio || 1)) / photo.naturalWidth;
       try {
         renderMockup(canvas.current!, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
-          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12 });
+          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12, mask: mask(k), feather: 1.5 * (window.devicePixelRatio || 1) });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Preview failed.");
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [photo, art, artView, place, opacity, blend, boxW, corners]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photo, art, artView, place, opacity, blend, boxW, corners, area, areaMode]);
 
   async function pickFile(f: File | null) {
     setError(null);
@@ -123,6 +128,8 @@ export default function TryOn() {
       setPhoto(img);
       setPhotoUrl(url);
       setPhotoFile(f);
+      setArea([]);
+      setAreaMode("off");
     } catch {
       URL.revokeObjectURL(url);
       setError("That file couldn't be opened as an image. Try another photo.");
@@ -141,10 +148,25 @@ export default function TryOn() {
     drag.current = { mode, i, p0: toPhoto(e), s0: { ...place, c: { ...place.c }, off: place.off.map((o) => ({ ...o })) } };
     box.current?.setPointerCapture(e.pointerId);
   };
+  function onBoxDown(e: React.PointerEvent) {
+    if (areaMode === "draw" && photo) setArea((a) => [...a, toPhoto(e)]);
+  }
+  const beginVertex = (i: number) => (e: React.PointerEvent) => {
+    if (!place) return;
+    e.stopPropagation();
+    e.preventDefault();
+    drag.current = { mode: "vertex", i, p0: toPhoto(e), s0: place };
+    box.current?.setPointerCapture(e.pointerId);
+  };
   function onMove(e: React.PointerEvent) {
     const g = drag.current;
     if (!g || !photo) return;
     const p = toPhoto(e), s = g.s0;
+    if (g.mode === "vertex" && g.i !== undefined) {
+      const clamp = { x: Math.min(photo.naturalWidth, Math.max(0, p.x)), y: Math.min(photo.naturalHeight, Math.max(0, p.y)) };
+      setArea((a) => a.map((v, j) => (j === g.i ? clamp : v)));
+      return;
+    }
     const ang = (q: Pt) => Math.atan2(q.y - s.c.y, q.x - s.c.x);
     if (g.mode === "move") setPlace({ ...s, c: { x: s.c.x + p.x - g.p0.x, y: s.c.y + p.y - g.p0.y } });
     if (g.mode === "rotate") setPlace({ ...s, rot: s.rot + ((ang(p) - ang(g.p0)) * 180) / Math.PI });
@@ -172,7 +194,7 @@ export default function TryOn() {
       const k = Math.min(1, 2400 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const out = document.createElement("canvas");
       renderMockup(out, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
-        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24 });
+        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24, mask: mask(k), feather: 2 });
       const blob = await new Promise<Blob | null>((ok) => out.toBlob(ok, "image/jpeg", 0.92));
       if (!blob) throw new Error("Couldn't create the preview.");
       if (result) URL.revokeObjectURL(result.url);
@@ -193,13 +215,18 @@ export default function TryOn() {
     try {
       const k = Math.min(1, 512 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const g = document.createElement("canvas");
-      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16 });
+      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16, mask: mask(k), feather: 1 });
       const guide = await new Promise<Blob | null>((ok) => g.toBlob(ok, "image/jpeg", 0.9));
       if (!guide) throw new Error("Couldn't prepare the mockup.");
       const form = new FormData();
       form.append("product", file);
       form.append("guide", guide, "guide.jpg");
       form.append("designId", designId);
+      // Where the AI result is allowed to show: the print area, or (if none) the design's own outline.
+      const mk = Math.min(1, 1024 / Math.max(photo.naturalWidth, photo.naturalHeight));
+      const region = (area.length >= 3 ? area : corners(place)).map((p) => ({ x: p.x * mk, y: p.y * mk }));
+      const maskBlob = await new Promise<Blob | null>((ok) => maskCanvas(region, photo.naturalWidth * mk, photo.naturalHeight * mk).toBlob(ok, "image/png"));
+      if (maskBlob) form.append("mask", maskBlob, "mask.png");
       // Send the customized (recolored / background-hidden) artwork, still watermarked, when the user changed it.
       if (isCustomized(colors)) {
         const custom = await new Promise<Blob | null>((ok) => artView.toBlob(ok, "image/png"));
@@ -273,10 +300,10 @@ export default function TryOn() {
               Upload a product photo to start
             </div>
           ) : (
-            <div ref={box} onPointerMove={onMove} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)}
-              style={{ aspectRatio: `${nw} / ${nh}` }} className="relative w-full touch-none select-none overflow-visible">
+            <div ref={box} onPointerDown={onBoxDown} onPointerMove={onMove} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)}
+              style={{ aspectRatio: `${nw} / ${nh}` }} className={`relative w-full touch-none select-none overflow-visible ${areaMode === "draw" ? "cursor-crosshair" : ""}`}>
               <canvas ref={canvas} className="absolute inset-0 h-full w-full rounded-2xl border border-stone-200" aria-label="Live mockup preview" />
-              {q.length === 4 && (
+              {q.length === 4 && areaMode !== "draw" && (
                 <>
                   <svg viewBox={`0 0 ${nw} ${nh}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-hidden rounded-2xl">
                     <polygon points={q.map((p) => `${p.x},${p.y}`).join(" ")} onPointerDown={begin("move")}
@@ -297,6 +324,51 @@ export default function TryOn() {
                   )}
                 </>
               )}
+              {area.length > 0 && (
+                <svg viewBox={`0 0 ${nw} ${nh}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden rounded-2xl">
+                  {areaMode === "draw" && area.length < 3
+                    ? <polyline points={area.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#c9952e" strokeWidth={Math.max(1.5, nw / 300)} />
+                    : <polygon points={area.map((p) => `${p.x},${p.y}`).join(" ")} fill={areaMode === "off" ? "none" : "rgba(223,184,114,0.18)"}
+                        stroke="#c9952e" strokeWidth={Math.max(1.5, nw / 300)} strokeDasharray={areaMode === "off" ? `${nw / 60} ${nw / 90}` : undefined} />}
+                </svg>
+              )}
+              {areaMode !== "off" && area.map((p, i) => (
+                <span key={`v${i}`} onPointerDown={areaMode === "edit" ? beginVertex(i) : undefined} aria-label={`Print area point ${i + 1}`}
+                  className={`${handle} h-4 w-4 border-[#c9952e] bg-[#dfb872] ${areaMode === "edit" ? "cursor-move" : "pointer-events-none"}`} style={pct(p)} />
+              ))}
+            </div>
+          )}
+
+          {photo && (
+            <div className="mt-3 space-y-2 rounded-2xl border border-[#ece3d9] bg-white/80 p-3 text-sm">
+              <p className="font-medium text-stone-800">Print area {area.length >= 3 && areaMode === "off" ? <span className="text-xs font-normal text-emerald-700">✓ design is clipped to it</span> : null}</p>
+              <p className="text-xs text-stone-500">
+                {areaMode === "draw"
+                  ? `Tap around the edge of the surface to print on (for a hoodie: just the front panel). ${area.length} point${area.length === 1 ? "" : "s"} so far.`
+                  : areaMode === "edit" ? "Drag the gold points to adjust the outline."
+                  : "Outline the part of the product the design may appear on, so it never spills onto the background, hands or hood."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {areaMode === "draw" ? (
+                  <>
+                    <button type="button" onClick={() => setAreaMode("off")} disabled={area.length < 3} className="rounded-full bg-violet-700 px-4 py-1.5 font-semibold text-white disabled:opacity-40">Finish outline</button>
+                    <button type="button" onClick={() => setArea((a) => a.slice(0, -1))} disabled={!area.length} className="rounded-full border border-stone-300 bg-white px-4 py-1.5 disabled:opacity-40">Undo point</button>
+                    <button type="button" onClick={() => { setArea([]); setAreaMode("off"); }} className="rounded-full border border-stone-300 bg-white px-4 py-1.5">Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => { setArea([]); setAreaMode("draw"); }} className="rounded-full border border-violet-300 bg-white px-4 py-1.5 font-semibold text-violet-800">
+                      {area.length >= 3 ? "Redraw print area" : "Outline print area"}
+                    </button>
+                    {area.length >= 3 && (
+                      <>
+                        <button type="button" onClick={() => setAreaMode(areaMode === "edit" ? "off" : "edit")} className="rounded-full border border-stone-300 bg-white px-4 py-1.5">{areaMode === "edit" ? "Done adjusting" : "Adjust outline"}</button>
+                        <button type="button" onClick={() => { setArea([]); setAreaMode("off"); }} className="rounded-full border border-stone-300 bg-white px-4 py-1.5">Remove print area</button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 

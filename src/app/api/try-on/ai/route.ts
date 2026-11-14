@@ -19,13 +19,12 @@ const clients = new Map<string, { day: string; count: number; last: number; busy
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PROMPT =
-  "Image 0 is a photo of a real product. Image 1 is a flat graphic design (artwork); any plain white area around it is empty space, not part of the print. Image 2 is a rough mockup showing " +
-  "where and how big the artwork should appear. Produce a realistic photo of the SAME product from image 0 with the " +
-  "artwork from image 1 printed on its surface, at the position, size and angle shown in image 2, following the " +
-  "product's curvature, lighting and shadows. Keep the product's exact shape, material, camera angle and the " +
-  "background unchanged. Keep the artwork's colours, shapes and any watermark text as close to image 1 as possible. " +
-  "The artwork is only a flat printed graphic: never turn its contents into real objects (floral artwork stays printed " +
-  "on a vase and must not become real flowers inside it).";
+  "Image 0 is the product photo. Image 1 is the customized artwork. Image 2 shows the placement of the artwork on the " +
+  "selected print area. Apply this artwork as a print on the selected product surface. Follow the fabric's folds, " +
+  "perspective, lighting, and shadows. Preserve the artwork's identity and colors. Do not add a rectangular background " +
+  "or alter anything outside the selected print area. Treat the artwork as a flat printed graphic only: never turn its " +
+  "contents into real objects (floral artwork stays printed on a vase and must not become real flowers). " +
+  "Keep the same framing, camera angle and composition as image 0.";
 
 async function toRef(buf: Buffer) {
   return sharp(buf).rotate().resize(512, 512, { fit: "inside" }).flatten({ background: "#ffffff" }).jpeg({ quality: 90 }).toBuffer();
@@ -61,7 +60,11 @@ export async function POST(req: Request) {
   if (!(guide instanceof File) || guide.size > 3 * 1024 * 1024) return NextResponse.json({ error: "Please place the design first." }, { status: 400 });
   if (!isValidObjectId(designId)) return NextResponse.json({ error: "Pick a design first." }, { status: 400 });
 
-  let refs: Buffer[], w: number, h: number;
+  const maskFile = form.get("mask");
+  if (!(maskFile instanceof File) || maskFile.type !== "image/png" || maskFile.size > 2 * 1024 * 1024)
+    return NextResponse.json({ error: "Please place the design first." }, { status: 400 });
+
+  let refs: Buffer[], w: number, h: number, base: Buffer, alpha: Buffer;
   try {
     const photo = Buffer.from(await product.arrayBuffer());
     const meta = await sharp(photo).rotate().metadata();
@@ -77,6 +80,9 @@ export async function POST(req: Request) {
     const useCustom = custom instanceof File && custom.size > 0 && custom.size <= 3 * 1024 * 1024 && TYPES.includes(custom.type);
     const art = await watermark(useCustom ? Buffer.from(await custom.arrayBuffer()) : d.bytes);
     refs = await Promise.all([toRef(photo), toRef(art), toRef(Buffer.from(await guide.arrayBuffer()))]);
+    // Original photo at output size, and the print-area mask as a softly feathered alpha channel.
+    base = await sharp(photo).rotate().resize(w, h, { fit: "fill" }).removeAlpha().toBuffer();
+    alpha = await sharp(Buffer.from(await maskFile.arrayBuffer())).resize(w, h, { fit: "fill" }).greyscale().blur(2).extractChannel(0).raw().toBuffer();
   } catch {
     return NextResponse.json({ error: "That photo couldn't be read. Try another image." }, { status: 400 });
   }
@@ -90,9 +96,14 @@ export async function POST(req: Request) {
   clients.set(ip, state);
   try {
     const image = await editWithFlux({ prompt: PROMPT, images: refs, width: w, height: h });
+    // Boundaries are enforced here, not by the prompt: the AI pixels are only kept inside the print area;
+    // everything outside it is the untouched original photo.
+    const rgb = await sharp(Buffer.from(image, "base64")).resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
+    const edited = await sharp(rgb, { raw: { width: w, height: h, channels: 3 } })
+      .joinChannel(alpha, { raw: { width: w, height: h, channels: 1 } }).png().toBuffer();
+    const out = await sharp(base).composite([{ input: edited }]).removeAlpha().jpeg({ quality: 90 }).toBuffer();
     logEvent("try_on", { designId });
-    const mime = image.startsWith("iVBOR") ? "image/png" : image.startsWith("UklGR") ? "image/webp" : "image/jpeg";
-    return NextResponse.json({ image: `data:${mime};base64,${image}` });
+    return NextResponse.json({ image: `data:image/jpeg;base64,${out.toString("base64")}` });
   } catch (e) {
     const err = e instanceof AiError ? e : new AiError("The AI preview couldn't be created.", "failed");
     return NextResponse.json({ error: err.message, code: err.code }, { status: err.code === "exhausted" ? 429 : err.code === "config" ? 503 : 502 });

@@ -13,7 +13,6 @@ const links = [
   { href: "/shop", label: "Shop" },
   { href: "/upload", label: "Sell a design" },
   { href: "/try-on", label: "Try It On" },
-  { href: "/requests", label: "Design My Object" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/agreements", label: "My Agreements" },
   { href: "/policy", label: "How it works & terms" },

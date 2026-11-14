@@ -1,115 +1,203 @@
 "use client";
-// Try It On: upload a photo of your product, place a design by hand (drag, resize, rotate),
-// then ask Gemini to apply it to the product. Photo uploads only: no camera.
-import { useEffect, useRef, useState } from "react";
+// Try It On: a product mockup made entirely in your browser (no AI, nothing uploaded).
+// Upload a product photo, place the design (drag, resize, rotate, perspective corners), then Create Preview.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { renderMockup, type Blend, type Pt } from "@/lib/mockup";
 
 type D = { _id: string; title: string; status: string };
+type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off = per-corner perspective offsets (× width)
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 5 * 1024 * 1024;
-const AI_LABEL = "AI-generated preview—details and final appearance may vary.";
+const MAX_BYTES = 10 * 1024 * 1024;
+const LABEL = "Product mockup—final appearance may vary.";
+const BLENDS: [Blend, string][] = [
+  ["multiply", "Multiply (printed look)"], ["source-over", "Normal"], ["overlay", "Overlay"],
+  ["soft-light", "Soft light"], ["screen", "Screen (light products)"], ["darken", "Darken"],
+];
+const ZERO = (): Pt[] => [0, 1, 2, 3].map(() => ({ x: 0, y: 0 }));
+const loadImg = (src: string) => new Promise<HTMLImageElement>((ok, fail) => {
+  const i = new Image();
+  i.onload = () => ok(i);
+  i.onerror = () => fail(new Error("load"));
+  i.src = src;
+});
 
 export default function TryOn() {
   const params = useSearchParams();
   const [designs, setDesigns] = useState<D[]>([]);
   const [designId, setDesignId] = useState(params.get("design") ?? "");
-  const [product, setProduct] = useState<File | null>(null);
-  const [productUrl, setProductUrl] = useState<string | null>(null);
-  const [aspect, setAspect] = useState(1);
-  const [pos, setPos] = useState({ x: 50, y: 50 }); // design centre, % of the photo
-  const [size, setSize] = useState(35); // design width, % of the photo width
-  const [rotation, setRotation] = useState(0);
-  const [aiReady, setAiReady] = useState<boolean | null>(null);
-  const [result, setResult] = useState<{ image: string; original: string; designId: string } | null>(null);
+  const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [art, setArt] = useState<HTMLImageElement | null>(null);
+  const [place, setPlace] = useState<Place | null>(null);
+  const [opacity, setOpacity] = useState(90);
+  const [blend, setBlend] = useState<Blend>("multiply");
+  const [result, setResult] = useState<{ url: string; original: string; designId: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const [boxW, setBoxW] = useState(0);
   const box = useRef<HTMLDivElement>(null);
-  const mode = useRef<"move" | "resize" | "rotate" | null>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const drag = useRef<{ mode: "move" | "corner" | "rotate" | "resize"; i?: number; p0: Pt; s0: Place } | null>(null);
 
+  // Designs list; carry over ?design= from the design page.
   useEffect(() => {
     fetch("/api/designs").then((r) => r.json()).then((data) => {
       const list: D[] = data.designs ?? [];
       setDesigns(list);
-      // Carry over the design from the design page (?design=…), otherwise pick the first one.
-      setDesignId((cur) => (cur && list.some((d) => d._id === cur) ? cur : cur || list[0]?._id || ""));
-    }).catch(() => {});
-    fetch("/api/try-on").then((r) => r.json()).then((d) => setAiReady(Boolean(d.ai))).catch(() => setAiReady(false));
+      setDesignId((cur) => (cur && list.some((d) => d._id === cur) ? cur : list[0]?._id ?? ""));
+    }).catch(() => setError("Couldn't load designs. Please refresh."));
   }, []);
 
-  function pickFile(f: File | null) {
-    setFileError(null);
-    setResult(null);
+  // Watermarked preview artwork only (same origin, so the canvas can export it). Never the private original.
+  useEffect(() => {
+    setArt(null);
+    if (!designId) return;
+    loadImg(`/api/designs/${designId}/image`).then(setArt).catch(() => setError("Couldn't load that design's preview."));
+  }, [designId]);
+
+  // Start (or reset) the placement when the photo or artwork changes.
+  const reset = useCallback(() => {
+    if (!photo || !art) return;
+    setPlace({ c: { x: photo.naturalWidth / 2, y: photo.naturalHeight / 2 }, w: photo.naturalWidth * 0.35, rot: 0, off: ZERO() });
+  }, [photo, art]);
+  useEffect(reset, [reset]);
+
+  useEffect(() => {
+    if (!box.current) return;
+    const ro = new ResizeObserver(([e]) => setBoxW(e.contentRect.width));
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  }, [photo]);
+
+  const corners = useCallback((p: Place): Pt[] => {
+    if (!art) return [];
+    const h = p.w * (art.naturalHeight / art.naturalWidth);
+    const base = [{ x: -p.w / 2, y: -h / 2 }, { x: p.w / 2, y: -h / 2 }, { x: p.w / 2, y: h / 2 }, { x: -p.w / 2, y: h / 2 }];
+    const r = (p.rot * Math.PI) / 180, cos = Math.cos(r), sin = Math.sin(r);
+    return base.map((b, i) => {
+      const lx = b.x + p.off[i].x * p.w, ly = b.y + p.off[i].y * p.w;
+      return { x: p.c.x + lx * cos - ly * sin, y: p.c.y + lx * sin + ly * cos };
+    });
+  }, [art]);
+
+  // Live preview (screen resolution).
+  useEffect(() => {
+    if (!photo || !art || !place || !canvas.current || !boxW) return;
+    const id = requestAnimationFrame(() => {
+      const k = (boxW * (window.devicePixelRatio || 1)) / photo.naturalWidth;
+      try {
+        renderMockup(canvas.current!, photo, art, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
+          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12 });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Preview failed.");
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [photo, art, place, opacity, blend, boxW, corners]);
+
+  async function pickFile(f: File | null) {
     setError(null);
+    setResult(null);
     if (!f) return;
-    if (!TYPES.includes(f.type)) return setFileError("Please choose a JPG, PNG or WebP photo.");
-    if (f.size > MAX_BYTES) return setFileError("Photo must be under 5MB.");
-    if (productUrl) URL.revokeObjectURL(productUrl);
-    setProduct(f);
-    setProductUrl(URL.createObjectURL(f));
-    setPos({ x: 50, y: 50 });
+    if (!TYPES.includes(f.type)) return setError("Please choose a JPG, PNG or WebP photo.");
+    if (f.size > MAX_BYTES) return setError("Photo must be under 10MB.");
+    const url = URL.createObjectURL(f);
+    try {
+      const img = await loadImg(url);
+      if (photoUrl) URL.revokeObjectURL(photoUrl);
+      setPhoto(img);
+      setPhotoUrl(url);
+    } catch {
+      URL.revokeObjectURL(url);
+      setError("That file couldn't be opened as an image. Try another photo.");
+    }
   }
 
-  function onPointerMove(e: React.PointerEvent) {
-    if (!mode.current || !box.current) return;
-    const r = box.current.getBoundingClientRect();
-    const px = ((e.clientX - r.left) / r.width) * 100, py = ((e.clientY - r.top) / r.height) * 100;
-    if (mode.current === "move") setPos({ x: Math.min(100, Math.max(0, px)), y: Math.min(100, Math.max(0, py)) });
-    const cx = r.left + (pos.x / 100) * r.width, cy = r.top + (pos.y / 100) * r.height;
-    if (mode.current === "resize") {
-      const dist = Math.hypot(e.clientX - cx, e.clientY - cy); // centre → corner ≈ half diagonal
-      setSize(Math.round(Math.min(100, Math.max(5, ((dist * 2) / Math.SQRT2 / r.width) * 100))));
-    }
-    if (mode.current === "rotate") setRotation(Math.round((Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90));
-  }
-  const start = (m: "move" | "resize" | "rotate") => (e: React.PointerEvent) => {
+  // Pointer → photo pixels
+  const toPhoto = (e: React.PointerEvent): Pt => {
+    const r = box.current!.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * photo!.naturalWidth, y: ((e.clientY - r.top) / r.height) * photo!.naturalHeight };
+  };
+  const begin = (mode: "move" | "corner" | "rotate" | "resize", i?: number) => (e: React.PointerEvent) => {
+    if (!place) return;
     e.stopPropagation();
-    mode.current = m;
+    e.preventDefault();
+    drag.current = { mode, i, p0: toPhoto(e), s0: { ...place, c: { ...place.c }, off: place.off.map((o) => ({ ...o })) } };
     box.current?.setPointerCapture(e.pointerId);
   };
-  const norm = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
+  function onMove(e: React.PointerEvent) {
+    const g = drag.current;
+    if (!g || !photo) return;
+    const p = toPhoto(e), s = g.s0;
+    const ang = (q: Pt) => Math.atan2(q.y - s.c.y, q.x - s.c.x);
+    if (g.mode === "move") setPlace({ ...s, c: { x: s.c.x + p.x - g.p0.x, y: s.c.y + p.y - g.p0.y } });
+    if (g.mode === "rotate") setPlace({ ...s, rot: s.rot + ((ang(p) - ang(g.p0)) * 180) / Math.PI });
+    if (g.mode === "resize") {
+      const f = Math.hypot(p.x - s.c.x, p.y - s.c.y) / Math.max(1, Math.hypot(g.p0.x - s.c.x, g.p0.y - s.c.y));
+      setPlace({ ...s, w: Math.max(photo.naturalWidth * 0.03, Math.min(photo.naturalWidth * 3, s.w * f)) });
+    }
+    if (g.mode === "corner" && g.i !== undefined && art) {
+      // Move one corner: convert the pointer back into the design's own (unrotated) frame.
+      const r = (-s.rot * Math.PI) / 180, dx = p.x - s.c.x, dy = p.y - s.c.y;
+      const lx = dx * Math.cos(r) - dy * Math.sin(r), ly = dx * Math.sin(r) + dy * Math.cos(r);
+      const h = s.w * (art.naturalHeight / art.naturalWidth);
+      const bx = (g.i === 1 || g.i === 2 ? 1 : -1) * (s.w / 2), by = (g.i >= 2 ? 1 : -1) * (h / 2);
+      const off = s.off.map((o, j) => (j === g.i ? { x: (lx - bx) / s.w, y: (ly - by) / s.w } : o));
+      setPlace({ ...s, off });
+    }
+  }
 
-  async function placeWithGemini() {
-    if (!product || !designId || !productUrl) return;
+  async function createPreview() {
+    if (!photo || !art || !place || !photoUrl) return;
     setBusy(true);
     setError(null);
-    setResult(null);
-    const form = new FormData();
-    form.append("product", product);
-    form.append("designId", designId);
-    form.append("x", String(pos.x));
-    form.append("y", String(pos.y));
-    form.append("size", String(size));
-    form.append("rotation", String(norm(rotation)));
     try {
-      const res = await fetch("/api/try-on", { method: "POST", body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.image) throw new Error(data.error || "Gemini couldn't make the preview. Please try again.");
-      setResult({ image: data.image, original: productUrl, designId });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      // Full resolution (capped at 2400px on the long side so phones don't run out of memory).
+      const k = Math.min(1, 2400 / Math.max(photo.naturalWidth, photo.naturalHeight));
+      const out = document.createElement("canvas");
+      renderMockup(out, photo, art, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
+        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24 });
+      const blob = await new Promise<Blob | null>((ok) => out.toBlob(ok, "image/jpeg", 0.92));
+      if (!blob) throw new Error("Couldn't create the preview.");
+      if (result) URL.revokeObjectURL(result.url);
+      setResult({ url: URL.createObjectURL(blob), original: photoUrl, designId });
+      fetch("/api/try-on", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ designId }) }).catch(() => {});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't create the preview. Please try again.");
     } finally {
       setBusy(false);
     }
   }
 
-  const selected = designs.find((d) => d._id === designId);
+  const q = place && art ? corners(place) : [];
+  const nw = photo?.naturalWidth ?? 1, nh = photo?.naturalHeight ?? 1;
+  // Handles stay inside the photo even when the design hangs off the edge, so they can always be grabbed.
+  const clampPct = (v: number) => Math.min(100, Math.max(0, v));
+  const pct = (p: Pt) => ({ left: `${clampPct((p.x / nw) * 100)}%`, top: `${clampPct((p.y / nh) * 100)}%` });
+  const handleOffset = (from: Pt, to: Pt, px: number) => { // a point `px` screen pixels beyond `to`, away from `from`
+    const len = Math.hypot(to.x - from.x, to.y - from.y) || 1, scale = boxW ? nw / boxW : 1;
+    return { x: to.x + ((to.x - from.x) / len) * px * scale, y: to.y + ((to.y - from.y) / len) * px * scale };
+  };
+  const topMid = q.length ? { x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 } : null;
   const step = "font-serif text-lg font-semibold text-violet-900";
+  const handle = "absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-violet-300 bg-white text-xs text-violet-700 shadow touch-none";
+  const selected = designs.find((d) => d._id === designId);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-4xl font-semibold text-violet-900">Try It On</h1>
-        <p className="text-stone-600">Upload a photo of your cup, vase, shirt or anything else and see a design on it before you buy.</p>
+        <p className="text-stone-600">See a design on your own cup, vase, shirt or anything else before you buy. Everything happens in your browser.</p>
       </div>
 
       <div className="grid gap-4 rounded-3xl border border-[#ece3d9] bg-white/80 p-5 shadow-sm sm:grid-cols-2">
         <label className="block">
           <span className={step}>1. Upload your product photo</span>
-          <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-violet-100 file:px-4 file:py-2 file:font-semibold file:text-violet-800 hover:file:bg-violet-200"
+          <input type="file" accept="image/jpeg,image/png,image/webp"
+            className="mt-2 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-violet-100 file:px-4 file:py-2 file:font-semibold file:text-violet-800 hover:file:bg-violet-200"
             onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
-          <span className="mt-1 block text-xs text-stone-500">JPG, PNG or WebP, up to 5MB.</span>
-          {fileError && <span className="mt-1 block text-sm text-red-700">{fileError}</span>}
+          <span className="mt-1 block text-xs text-stone-500">JPG, PNG or WebP, up to 10MB. Your photo never leaves your device.</span>
         </label>
         <label className="block">
           <span className={step}>2. Choose a design</span>
@@ -127,60 +215,65 @@ export default function TryOn() {
         </label>
       </div>
 
-      <section className="space-y-3">
-        <h2 className={step}>3. Position it by hand</h2>
-        <p className="text-sm text-stone-500">Drag the design to move it. Use the ↘ corner to resize and the ⟳ handle to rotate.</p>
-        <div className="mx-auto max-w-xl">
-          <span className="mb-2 inline-block rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">Manual preview (not AI-generated)</span>
-          <div ref={box} onPointerMove={onPointerMove} onPointerUp={() => (mode.current = null)} onPointerCancel={() => (mode.current = null)}
-            style={{ aspectRatio: productUrl ? aspect : 1 }}
-            className="relative w-full touch-none select-none overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">
-            {productUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={productUrl} alt="Your product" draggable={false} className="h-full w-full object-fill"
-                onLoad={(e) => setAspect(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight || 1)} />
-            ) : (
-              <p className="flex h-full items-center justify-center px-6 text-center text-stone-400">Upload a product photo to start</p>
-            )}
-            {productUrl && designId && (
-              <div onPointerDown={start("move")} className="absolute cursor-move"
-                style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${size}%`, transform: `translate(-50%, -50%) rotate(${rotation}deg)` }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/designs/${designId}/image`} alt="Design" draggable={false} className="block w-full opacity-90 mix-blend-multiply outline outline-1 outline-dashed outline-violet-500" />
-                <span onPointerDown={start("rotate")} title="Rotate" aria-label="Rotate"
-                  className="absolute -top-9 left-1/2 flex h-7 w-7 -translate-x-1/2 cursor-grab items-center justify-center rounded-full border border-violet-300 bg-white text-sm text-violet-700 shadow">⟳</span>
-                <span onPointerDown={start("resize")} title="Resize" aria-label="Resize"
-                  className="absolute -bottom-3 -right-3 flex h-7 w-7 cursor-nwse-resize items-center justify-center rounded-full border border-violet-300 bg-white text-xs text-violet-700 shadow">↘</span>
-              </div>
-            )}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
-            <label>Size <input type="range" min={5} max={100} value={size} onChange={(e) => setSize(+e.target.value)} className="block w-full accent-violet-600" /></label>
-            <label>Rotate <input type="range" min={-180} max={180} value={norm(rotation)} onChange={(e) => setRotation(+e.target.value)} className="block w-full accent-violet-600" /></label>
-          </div>
-        </div>
-      </section>
+      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-      <section className="space-y-3 rounded-3xl border border-violet-200 bg-violet-50/50 p-5">
-        <h2 className={step}>4. Place it with Gemini</h2>
-        <p className="text-sm text-stone-600">
-          When you click the button, your uploaded photo and the selected design&apos;s watermarked preview are sent to Google Gemini
-          to create the AI preview. Don&apos;t upload photos with people or private information.
-        </p>
-        {aiReady === false && (
-          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">AI try-on isn&apos;t available on this server right now. Your manual preview above still works.</p>
-        )}
-        <div className="flex flex-wrap gap-3">
-          <button onClick={placeWithGemini} disabled={!product || !designId || busy || aiReady === false}
-            className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
-            {busy ? "Gemini is placing your design…" : "✨ Place it with Gemini"}
-          </button>
-          {error && !busy && (
-            <button onClick={placeWithGemini} className="rounded-full border border-violet-300 bg-white px-5 py-3 font-semibold text-violet-800 hover:bg-violet-50">Try again</button>
+      <section className="space-y-3">
+        <h2 className={step}>3. Place the design</h2>
+        <p className="text-sm text-stone-500">Drag to move. ⟳ rotates, ⤡ resizes, and the four corner dots tilt the perspective.</p>
+        <div className="mx-auto max-w-xl">
+          {!photo ? (
+            <div className="flex aspect-square items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-6 text-center text-stone-400">
+              Upload a product photo to start
+            </div>
+          ) : (
+            <div ref={box} onPointerMove={onMove} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)}
+              style={{ aspectRatio: `${nw} / ${nh}` }} className="relative w-full touch-none select-none overflow-visible">
+              <canvas ref={canvas} className="absolute inset-0 h-full w-full rounded-2xl border border-stone-200" aria-label="Live mockup preview" />
+              {q.length === 4 && (
+                <>
+                  <svg viewBox={`0 0 ${nw} ${nh}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-hidden rounded-2xl">
+                    <polygon points={q.map((p) => `${p.x},${p.y}`).join(" ")} onPointerDown={begin("move")}
+                      fill="transparent" stroke="#7c3aed" strokeWidth={Math.max(1, nw / 400)} strokeDasharray={`${nw / 80} ${nw / 120}`}
+                      style={{ cursor: "move", pointerEvents: "all" }} />
+                  </svg>
+                  {q.map((p, i) => (
+                    <span key={i} onPointerDown={begin("corner", i)} aria-label={`Perspective corner ${i + 1}`}
+                      className={`${handle} h-5 w-5 cursor-crosshair bg-violet-600`} style={pct(p)} />
+                  ))}
+                  {topMid && place && (
+                    <span onPointerDown={begin("rotate")} aria-label="Rotate" className={`${handle} cursor-grab`}
+                      style={pct(handleOffset(place.c, topMid, 30))}>⟳</span>
+                  )}
+                  {place && (
+                    <span onPointerDown={begin("resize")} aria-label="Resize" className={`${handle} cursor-nwse-resize`}
+                      style={pct(handleOffset(place.c, q[2], 26))}>⤡</span>
+                  )}
+                </>
+              )}
+            </div>
           )}
+
+          <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+            <label>Opacity: {opacity}%
+              <input type="range" min={20} max={100} value={opacity} onChange={(e) => setOpacity(+e.target.value)} className="block w-full accent-violet-600" />
+            </label>
+            <label>Blending
+              <select value={blend} onChange={(e) => setBlend(e.target.value as Blend)} className="mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2">
+                {BLENDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button onClick={createPreview} disabled={!photo || !art || !place || busy}
+              className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
+              {busy ? "Creating preview…" : "Create Preview"}
+            </button>
+            <button onClick={reset} disabled={!photo || !art}
+              className="rounded-full border border-violet-300 bg-white px-5 py-3 font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-40">
+              Reset placement
+            </button>
+          </div>
         </div>
-        {busy && <p className="text-sm text-violet-800">This usually takes 10–30 seconds.</p>}
-        {error && !busy && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       </section>
 
       {result && (
@@ -192,17 +285,20 @@ export default function TryOn() {
               <img src={result.original} alt="Your original product photo" className="w-full rounded-2xl border border-stone-200 bg-white object-contain" />
             </figure>
             <figure className="space-y-2">
-              <figcaption className="text-sm font-semibold text-violet-800">AI Try-On</figcaption>
+              <figcaption className="text-sm font-semibold text-violet-800">Product Mockup</figcaption>
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={result.image} alt="AI-generated try-on preview" className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />
+                <img src={result.url} alt="Product mockup" className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/api/designs/${result.designId}/image`} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
                   className="absolute right-3 top-3 h-14 w-14 rounded-xl border-2 border-white object-cover shadow-md sm:h-16 sm:w-16" />
               </div>
             </figure>
           </div>
-          <p className="text-center text-xs font-medium text-stone-500">{AI_LABEL}</p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <p className="text-xs font-medium text-stone-500">{LABEL}</p>
+            <a href={result.url} download="ownique-mockup.jpg" className="text-xs font-semibold text-violet-700 underline">Download mockup</a>
+          </div>
         </section>
       )}
     </div>

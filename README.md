@@ -18,7 +18,7 @@ Built at **HackPrinceton Fall 2026** (Business & Enterprise track).
 - **Exclusive Ownership Terms preview:** before checkout, buyers see exactly which rights they get for that design
 - **Buy & Own It:** buyer pays the designer in SOL, the server verifies the payment on Solana, then moves the 1-of-1 ownership token (Metaplex Core) from the vault to the buyer
 - **Copy detector:** blocks exact copies (SHA-256) and look-alike copies (perceptual hash); borderline cases are judged by **Gemini**
-- **Try It On:** drag a design onto a photo of your own product, or let **Gemini** look at it and place the design for you (photorealistic render on a paid Gemini plan)
+- **Try It On:** upload a photo of your product, drag/resize/rotate the design and adjust perspective, opacity and blending, then create a mockup rendered entirely in the browser (photos never leave your device)
 - **Live dashboard:** every view, try-on, sale, upload, blocked copy and report is logged to **Tiger Data** (hypertable + per-minute continuous aggregate) and charted live
 - **Watermarked previews:** everyone sees a watermarked copy; only the owner can download the full file by signing with their wallet
 - **Certificate of Creation:** a printable proof page for every design (creator, time, file fingerprint, Solana token, owner)
@@ -77,7 +77,7 @@ Everything below is open-source or a sponsor service. Our team wrote the Ownique
 | [LangChain](https://js.langchain.com) + [Deep Agents](https://github.com/langchain-ai/deepagentsjs) + [@langchain/xai](https://www.npmjs.com/package/@langchain/xai) | The Ask Ownique agent |
 | **Capital One Nessie API** | "Pay with bank" checkout (practice bank accounts) |
 | **Grok API** (SpaceXSI) | Ask Ownique, design descriptions, Grok Bot changelog |
-| **Gemini API** (Google) | Copy detector judgment + Try It On |
+| **Gemini API** (Google) | Copy detector judgment |
 | [Zod](https://zod.dev) | Tool input schemas |
 | **Vultr**, Docker, Nginx, Certbot | Hosting |
 | **GoDaddy Registry** | Domain |
@@ -90,7 +90,7 @@ Everything below is open-source or a sponsor service. Our team wrote the Ownique
 | LangChain Deep Agents | Ask Ownique is a Deep Agent with Ownique tools |
 | Solana | Ownership tokens + payments |
 | MongoDB Atlas | Users, designs, reports |
-| Gemini | Copy detector + Try It On |
+| Gemini | Copy detector |
 | Tiger Data | Live sales dashboard |
 | Vultr | Hosting |
 | GoDaddy Registry | Our domain |

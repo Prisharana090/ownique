@@ -13,13 +13,13 @@ One design. One owner. Credit forever.
 **Sponsor tracks (opt into all of these on Devpost):**
 | Track | Why Ownique fits |
 |---|---|
-| Amazon: Best Practical AI Innovation | Practical AI that protects real creators: Ask Ownique checks designs for brand look-alikes before listing; the copy detector blocks stolen re-uploads; Try It On previews products |
+| Amazon: Best Practical AI Innovation | Practical AI that protects real creators: Ask Ownique checks designs for brand look-alikes before listing; the copy detector blocks stolen re-uploads; Try It On makes in-browser product mockups |
 | LangChain: Best use of Deep Agents | Ask Ownique is a Deep Agent with 5 custom tools: search_designs, get_design, get_ownership_record, lookup_terms, get_platform_stats, plus image checks |
 | Capital One: Best use of Nessie | "Pay with bank" checkout: buyers without crypto pay the designer bank-to-bank through Nessie practice accounts, and ownership still moves on Solana |
 | MLH: Best Use of Solana | Wallet identity, on-chain payment verification, 1-of-1 Metaplex Core ownership tokens with the creator recorded forever |
 | MLH: Best Use of MongoDB Atlas | Users, designs (with images), reports |
 | MLH: Best Use of Tiger Data | Hypertable of every event + per-minute continuous aggregate powering a live dashboard |
-| MLH: Best Use of Gemini API | Copy detector judgment + Try It On realistic previews |
+| MLH: Best Use of Gemini API | Copy detector judgment (is this upload the same design as an existing one?) |
 | MLH: SpaceXSI raffle (Cursor + Grok Bot) | Grok powers Ask Ownique + descriptions; Grok Bot GitHub Action writes our changelog |
 | MLH: Best Use of Vultr | Production hosting (Docker + Nginx + HTTPS) |
 | MLH: Best Domain from GoDaddy Registry | [yourdomain] |
@@ -37,7 +37,7 @@ Designers sell their work online and lose control of it. The same design gets so
 Ownique is a design marketplace where **every design sells exactly once**.
 - **Designers** upload original work, agree to clear ownership rules, and set a price in SOL. Grok writes the description.
 - Each design becomes a **1-of-1 ownership token on Solana**, with the designer's wallet stored on-chain **forever** as the creator.
-- **Buyers** can **Try It On**: upload a photo of their own cup, glasses, or shirt, and Gemini looks at both images and places the design where it fits best, with a styling tip (and a photorealistic render on a paid Gemini plan).
+- **Buyers** can **Try It On**: upload a photo of their own cup, vase or shirt, place the design with drag, resize, rotate and perspective corners, pick opacity and blending, and get a product mockup rendered in the browser (no AI, the photo never leaves their device).
 - When a buyer pays, the server **verifies the payment on Solana**, marks the design sold (only once, even if two people click at the same moment), and **moves the ownership token to the buyer's wallet**.
 - Only the owner can download the full-quality file, by signing a free message with their wallet. Everyone else sees a watermarked preview.
 - A **copy detector** blocks re-uploads of designs that already exist, including resized or edited copies, with Gemini judging the close calls.
@@ -48,7 +48,7 @@ Ownique is a design marketplace where **every design sells exactly once**.
 - **Next.js 15 + TypeScript + Tailwind**: the website
 - **Solana (devnet)**: Phantom wallet login, SOL payments verified on-chain, Metaplex Core 1-of-1 ownership tokens held by a vault wallet (like escrow) until sold
 - **MongoDB Atlas**: users, designs (with images), and reports
-- **Gemini API**: copy detector (compares two images) + Try It On (image editing model)
+- **Gemini API**: copy detector (compares two images)
 - **Grok (xAI)**: writes each design's description and tags, and our **Grok Bot**, a GitHub Action that turns every push into a plain-English changelog entry (and posts it to Discord)
 - **Tiger Data**: every event goes into a TimescaleDB hypertable, with a per-minute continuous aggregate powering the live dashboard
 - **Vultr**: hosting, with a Docker image + Nginx + HTTPS
@@ -60,7 +60,7 @@ Ownique is a design marketplace where **every design sells exactly once**.
 | Cursor | Core AI coding agent for the whole build (see `.cursorrules`) |
 | LangChain Deep Agents | Ask Ownique is a Deep Agent with Ownique-specific tools |
 | Grok Bot | Powers the Ask Ownique agent (incl. brand look-alike checks), writes design descriptions in-app; GitHub Action summarizes every push into `CHANGELOG.md` + Discord |
-| Gemini API | Judges whether two images are the same design; looks at product photos to place designs in Try It On |
+| Gemini API | Judges whether two images are the same design |
 | Solana | Wallet identity, verified SOL payments, 1-of-1 Metaplex Core ownership tokens with on-chain creator credit |
 | MongoDB Atlas | Users, designs, images, reports |
 | Capital One Nessie | "Pay with bank" checkout with practice bank accounts |

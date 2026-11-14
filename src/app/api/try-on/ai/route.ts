@@ -19,7 +19,7 @@ const clients = new Map<string, { day: string; count: number; last: number; busy
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PROMPT =
-  "Image 0 is a photo of a real product. Image 1 is a flat graphic design (artwork). Image 2 is a rough mockup showing " +
+  "Image 0 is a photo of a real product. Image 1 is a flat graphic design (artwork); any plain white area around it is empty space, not part of the print. Image 2 is a rough mockup showing " +
   "where and how big the artwork should appear. Produce a realistic photo of the SAME product from image 0 with the " +
   "artwork from image 1 printed on its surface, at the position, size and angle shown in image 2, following the " +
   "product's curvature, lighting and shadows. Keep the product's exact shape, material, camera angle and the " +
@@ -71,7 +71,11 @@ export async function POST(req: Request) {
     await connectDb();
     const d = await loadOriginal(designId);
     if (!d || d.status === "hidden") return NextResponse.json({ error: "Design not found." }, { status: 404 });
-    const art = await watermark(d.bytes); // authorized watermarked preview only
+    // Authorized watermarked preview only. If the visitor recolored it in Try It On, use their customized copy
+    // (made in the browser from the watermarked preview) and stamp the watermark again on the server.
+    const custom = form.get("artwork");
+    const useCustom = custom instanceof File && custom.size > 0 && custom.size <= 3 * 1024 * 1024 && TYPES.includes(custom.type);
+    const art = await watermark(useCustom ? Buffer.from(await custom.arrayBuffer()) : d.bytes);
     refs = await Promise.all([toRef(photo), toRef(art), toRef(Buffer.from(await guide.arrayBuffer()))]);
   } catch {
     return NextResponse.json({ error: "That photo couldn't be read. Try another image." }, { status: 400 });

@@ -55,7 +55,7 @@ export type Blend = "source-over" | "multiply" | "overlay" | "soft-light" | "scr
  * The artwork is warped on its own layer first, then blended onto the photo once (no seams in blend modes).
  */
 export function renderMockup(
-  canvas: HTMLCanvasElement, photo: CanvasImageSource, art: HTMLImageElement,
+  canvas: HTMLCanvasElement, photo: CanvasImageSource, art: HTMLImageElement | HTMLCanvasElement,
   quad: Pt[], width: number, height: number, opts: { opacity: number; blend: Blend; grid?: number }
 ) {
   canvas.width = Math.round(width);
@@ -71,7 +71,9 @@ export function renderMockup(
   const lctx = layer.getContext("2d")!;
   lctx.imageSmoothingQuality = "high";
   const map = squareToQuad(quad);
-  const n = opts.grid ?? 16, aw = art.naturalWidth, ah = art.naturalHeight;
+  const n = opts.grid ?? 16;
+  const aw = art instanceof HTMLImageElement ? art.naturalWidth : art.width;
+  const ah = art instanceof HTMLImageElement ? art.naturalHeight : art.height;
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       const u0 = i / n, u1 = (i + 1) / n, v0 = j / n, v1 = (j + 1) / n;

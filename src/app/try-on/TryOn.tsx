@@ -1,9 +1,11 @@
 "use client";
 // Try It On: a product mockup made entirely in your browser (no AI, nothing uploaded).
 // Upload a product photo, place the design (drag, resize, rotate, perspective corners), then Create Preview.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { renderMockup, type Blend, type Pt } from "@/lib/mockup";
+import { DEFAULT_COLORS, customizeArt, isCustomized, type ColorSettings } from "@/lib/artColor";
+import DesignColors from "./DesignColors";
 
 type D = { _id: string; title: string; status: string };
 type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off = per-corner perspective offsets (× width)
@@ -34,12 +36,15 @@ export default function TryOn() {
   const [place, setPlace] = useState<Place | null>(null);
   const [opacity, setOpacity] = useState(90);
   const [blend, setBlend] = useState<Blend>("multiply");
-  const [result, setResult] = useState<{ url: string; original: string; designId: string } | null>(null);
+  const [result, setResult] = useState<{ url: string; original: string; designId: string; thumb?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [boxW, setBoxW] = useState(0);
+  const [colors, setColors] = useState<ColorSettings>(DEFAULT_COLORS);
+  // The artwork actually drawn: the watermarked preview with the user's preview-only color changes.
+  const artView = useMemo(() => (art ? customizeArt(art, colors) : null), [art, colors]);
   const [ai, setAi] = useState<{ available: boolean; remaining: number } | null>(null);
-  const [aiResult, setAiResult] = useState<{ url: string; original: string; designId: string } | null>(null);
+  const [aiResult, setAiResult] = useState<{ url: string; original: string; designId: string; thumb?: string } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -59,6 +64,7 @@ export default function TryOn() {
   // Watermarked preview artwork only (same origin, so the canvas can export it). Never the private original.
   useEffect(() => {
     setArt(null);
+    setColors(DEFAULT_COLORS);
     if (!designId) return;
     loadImg(`/api/designs/${designId}/image`).then(setArt).catch(() => setError("Couldn't load that design's preview."));
   }, [designId]);
@@ -90,18 +96,18 @@ export default function TryOn() {
 
   // Live preview (screen resolution).
   useEffect(() => {
-    if (!photo || !art || !place || !canvas.current || !boxW) return;
+    if (!photo || !art || !artView || !place || !canvas.current || !boxW) return;
     const id = requestAnimationFrame(() => {
       const k = (boxW * (window.devicePixelRatio || 1)) / photo.naturalWidth;
       try {
-        renderMockup(canvas.current!, photo, art, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
+        renderMockup(canvas.current!, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
           photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12 });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Preview failed.");
       }
     });
     return () => cancelAnimationFrame(id);
-  }, [photo, art, place, opacity, blend, boxW, corners]);
+  }, [photo, art, artView, place, opacity, blend, boxW, corners]);
 
   async function pickFile(f: File | null) {
     setError(null);
@@ -158,19 +164,19 @@ export default function TryOn() {
   }
 
   async function createPreview() {
-    if (!photo || !art || !place || !photoUrl) return;
+    if (!photo || !art || !artView || !place || !photoUrl) return;
     setBusy(true);
     setError(null);
     try {
       // Full resolution (capped at 2400px on the long side so phones don't run out of memory).
       const k = Math.min(1, 2400 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const out = document.createElement("canvas");
-      renderMockup(out, photo, art, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
+      renderMockup(out, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
         photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24 });
       const blob = await new Promise<Blob | null>((ok) => out.toBlob(ok, "image/jpeg", 0.92));
       if (!blob) throw new Error("Couldn't create the preview.");
       if (result) URL.revokeObjectURL(result.url);
-      setResult({ url: URL.createObjectURL(blob), original: photoUrl, designId });
+      setResult({ url: URL.createObjectURL(blob), original: photoUrl, designId, thumb: isCustomized(colors) ? artView.toDataURL("image/png") : undefined });
       fetch("/api/try-on", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ designId }) }).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't create the preview. Please try again.");
@@ -181,23 +187,28 @@ export default function TryOn() {
 
   /** Optional: Cloudflare Workers AI makes a realistic version from the photo, the watermarked art and our mockup. */
   async function aiPreview(file: File | null) {
-    if (!file || !photo || !art || !place || !photoUrl || aiBusy) return;
+    if (!file || !photo || !art || !artView || !place || !photoUrl || aiBusy) return;
     setAiBusy(true);
     setAiError(null);
     try {
       const k = Math.min(1, 512 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const g = document.createElement("canvas");
-      renderMockup(g, photo, art, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16 });
+      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16 });
       const guide = await new Promise<Blob | null>((ok) => g.toBlob(ok, "image/jpeg", 0.9));
       if (!guide) throw new Error("Couldn't prepare the mockup.");
       const form = new FormData();
       form.append("product", file);
       form.append("guide", guide, "guide.jpg");
       form.append("designId", designId);
+      // Send the customized (recolored / background-hidden) artwork, still watermarked, when the user changed it.
+      if (isCustomized(colors)) {
+        const custom = await new Promise<Blob | null>((ok) => artView.toBlob(ok, "image/png"));
+        if (custom) form.append("artwork", custom, "artwork.png");
+      }
       const res = await fetch("/api/try-on/ai", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.image) throw new Error(data.error || "The AI preview couldn't be created.");
-      setAiResult({ url: data.image, original: photoUrl, designId });
+      setAiResult({ url: data.image, original: photoUrl, designId, thumb: isCustomized(colors) ? artView.toDataURL("image/png") : undefined });
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "The AI preview couldn't be created.");
     } finally {
@@ -289,6 +300,8 @@ export default function TryOn() {
             </div>
           )}
 
+          {art && <DesignColors art={art} preview={artView} value={colors} onChange={setColors} />}
+
           <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
             <label>Opacity: {opacity}%
               <input type="range" min={20} max={100} value={opacity} onChange={(e) => setOpacity(+e.target.value)} className="block w-full accent-violet-600" />
@@ -335,7 +348,7 @@ export default function TryOn() {
 }
 
 function Compare({ r, title, label, download, selected }: {
-  r: { url: string; original: string; designId: string }; title: string; label: string; download?: boolean; selected?: D;
+  r: { url: string; original: string; designId: string; thumb?: string }; title: string; label: string; download?: boolean; selected?: D;
 }) {
   return (
     <section className="space-y-3">
@@ -351,8 +364,8 @@ function Compare({ r, title, label, download, selected }: {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={r.url} alt={title} className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/designs/${r.designId}/image`} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
-              className="absolute right-3 top-3 h-14 w-14 rounded-xl border-2 border-white object-cover shadow-md sm:h-16 sm:w-16" />
+            <img src={r.thumb ?? `/api/designs/${r.designId}/image`} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
+              className="absolute right-3 top-3 h-14 w-14 rounded-xl border-2 border-white bg-[conic-gradient(#eee_25%,#fff_0_50%,#eee_0_75%,#fff_0)] bg-[length:12px_12px] object-contain shadow-md sm:h-16 sm:w-16" />
           </div>
         </figure>
       </div>

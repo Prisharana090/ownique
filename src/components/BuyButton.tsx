@@ -14,12 +14,12 @@ const BUYER_CONFIRMATIONS = [
   "I agree to the Ownership Policy.",
 ];
 
-export default function BuyButton(props: { designId: string; title: string; price: number; designerWallet: string }) {
+export default function BuyButton(props: { designId: string; title: string; price: number; designerWallet: string; initialOpen?: boolean }) {
   const router = useRouter();
   const { connection } = useConnection();
   const { publicKey, sendTransaction, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(props.initialOpen));
   const [checked, setChecked] = useState(BUYER_CONFIRMATIONS.map(() => false));
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +98,10 @@ export default function BuyButton(props: { designId: string; title: string; pric
 
   return (
     <div className="space-y-3 rounded-2xl border border-violet-200 bg-white p-5 shadow-sm">
-      <p className="font-semibold">Before you buy</p>
+      <p className="font-semibold">Confirm your purchase</p>
+      <p className="text-xs text-stone-500">
+        You&apos;re agreeing to the <a href={`/design/${props.designId}/terms`} className="underline">Exclusive Ownership Terms</a> for this design.
+      </p>
       {BUYER_CONFIRMATIONS.map((text, i) => (
         <label key={i} className="flex gap-2 text-sm">
           <input type="checkbox" className="mt-0.5 accent-violet-600" checked={checked[i]} disabled={busy}

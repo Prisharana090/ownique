@@ -10,14 +10,15 @@ const ownership: Section[] = [
       "You upload original work and set your price.",
       "When it sells, ownership moves to the buyer, permanently.",
       "You keep your name on it forever as the creator.",
-      "You can show it in your portfolio, but you can't sell or reuse it again.",
+      "After it sells, you can't sell or reuse it again. Showing it in your portfolio needs the buyer's separate permission.",
     ],
   },
   {
     id: "buyers",
     title: "🛍️ For buyers",
     items: [
-      "You get full rights to use the design on your products.",
+      "You get exclusive copyright ownership (subject to the purchase agreement) plus the right to use, reproduce, modify, manufacture and sell products with the design.",
+      "Every design shows its Exclusive Ownership Terms before you buy.",
       "No one else can ever buy the same design.",
       "Your ownership is recorded on Solana, so it's permanent and can't be faked.",
     ],

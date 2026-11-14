@@ -93,7 +93,7 @@ const ownershipRecord = tool(
 
 const TERMS: Record<string, string> = {
   ownership:
-    "Each design sells exactly once. The buyer gets full ownership; the designer is credited forever and can show it in a portfolio, but can never sell or reuse it again. Ownership is recorded on Solana.",
+    "Each design sells exactly once. The buyer gets full ownership; the designer is credited forever but keeps no commercial ownership and can never sell or reuse it again; showing it in a portfolio needs the buyer's separate permission. Buyers get exclusive copyright ownership (subject to the purchase agreement) and the rights to use commercially, reproduce, modify, manufacture and sell products with it. Ownership is recorded on Solana.",
   payment:
     "The ownership token waits in a secure Ownique vault. The buyer pays the designer directly in SOL; Ownique verifies the payment on Solana and only then moves the token to the buyer. Each payment can be used once.",
   copyright:

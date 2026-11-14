@@ -18,8 +18,15 @@ type D = {
   paymentMethod?: string | null; priceUsd?: number | null; tokenTransferSignature?: string | null;
 };
 
-export default async function DesignPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DesignPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ checkout?: string }>;
+}) {
   const { id } = await params;
+  const { checkout } = await searchParams;
   if (!hasDb() || !isValidObjectId(id)) notFound();
   await connectDb();
   const doc = await Design.findById(id).lean();
@@ -73,7 +80,17 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
         ) : (
           <div className="space-y-3">
             <p className="font-serif text-4xl text-violet-900">{d.price} <span className="text-2xl text-fuchsia-500">SOL</span></p>
-            <BuyButton designId={d._id} title={d.title} price={d.price} designerWallet={d.designerWallet} />
+            <div id="buy" className="scroll-mt-24">
+              {checkout === "1" ? (
+                // Buyer has read the Exclusive Ownership Terms → show the checkout
+                <BuyButton designId={d._id} title={d.title} price={d.price} designerWallet={d.designerWallet} initialOpen />
+              ) : (
+                <Link href={`/design/${d._id}/terms`}
+                  className="block w-full rounded-full bg-violet-700 py-3 text-center font-semibold text-white hover:bg-violet-800">
+                  Buy &amp; Own It
+                </Link>
+              )}
+            </div>
             <a href={`/try-on?design=${d._id}`}
               className="block w-full rounded-xl border border-stone-300 py-3 text-center font-semibold hover:bg-stone-50">
               ☕ Try It On

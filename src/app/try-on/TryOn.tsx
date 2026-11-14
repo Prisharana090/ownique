@@ -13,7 +13,7 @@ type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const LABEL = "Product mockup—final appearance may vary.";
-const AI_LABEL = "AI-generated preview—details and final appearance may vary.";
+const AI_LABEL = "AI-generated approximation—details and final appearance may vary.";
 const BLENDS: [Blend, string][] = [
   ["multiply", "Multiply (printed look)"], ["source-over", "Normal"], ["overlay", "Overlay"],
   ["soft-light", "Soft light"], ["screen", "Screen (light products)"], ["darken", "Darken"],
@@ -44,7 +44,7 @@ export default function TryOn() {
   const [colors, setColors] = useState<ColorSettings>(DEFAULT_COLORS);
   // The artwork actually drawn: the watermarked preview with the user's preview-only color changes.
   const artView = useMemo(() => (art ? customizeArt(art, colors) : null), [art, colors]);
-  const [ai, setAi] = useState<{ available: boolean; remaining: number } | null>(null);
+  const [ai, setAi] = useState<{ available: boolean; remaining: number; provider?: "gemini" | "cloudflare" | null } | null>(null);
   const [aiResult, setAiResult] = useState<{ url: string; original: string; designId: string; thumb?: string } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -482,16 +482,18 @@ export default function TryOn() {
       {result && <Compare r={result} title="Product Mockup" kind="manual" label={LABEL} download selected={selected} />}
 
       <section className="space-y-3 rounded-3xl border border-violet-200 bg-violet-50/50 p-5">
-        <h2 className={step}>Optional: AI-Enhanced Preview</h2>
+        <h2 className={step}>Optional: AI Try-On</h2>
         <p className="text-sm text-stone-600">
-          This sends your product photo, the design&apos;s watermarked preview and your mockup to Cloudflare Workers AI to create a
-          more realistic image. Nothing is saved by Ownique. Don&apos;t use photos with people or private information.
+          This sends your product photo, the design&apos;s watermarked preview and your mockup (placement, size, rotation and colors)
+          to {ai?.provider === "gemini" ? "Google Gemini" : ai?.provider === "cloudflare" ? "Cloudflare Workers AI" : "an AI image service"} to create a
+          more realistic image. Ownique keeps everything outside the print area exactly as in your photo and doesn&apos;t save the images.
+          Don&apos;t upload photos of other people without their permission.
         </p>
-        {ai && !ai.available && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">AI-Enhanced Preview isn&apos;t available right now. Your manual mockup above still works.</p>}
+        {ai && !ai.available && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">AI Try-On isn&apos;t available right now. Your manual mockup above still works.</p>}
         {ai?.available && <p className="text-xs text-stone-500">AI previews left today (whole site): {ai.remaining}</p>}
         <button onClick={() => aiPreview(photoFile)} disabled={!photoFile || !place || aiBusy || !ai?.available || ai.remaining <= 0}
           className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
-          {aiBusy ? "Creating AI preview… (up to a minute)" : "AI-Enhanced Preview"}
+          {aiBusy ? "Generating AI Try-On… (up to a minute)" : aiError ? "Try again" : "Generate AI Try-On"}
         </button>
         {aiError && !aiBusy && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{aiError}</p>}
       </section>

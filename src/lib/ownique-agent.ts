@@ -103,7 +103,7 @@ const TERMS: Record<string, string> = {
   reporting:
     "Tap Report on a design. Listed designs are hidden immediately while reviewed; valid reports lead to removal, and repeat offenders lose their account.",
   privacy:
-    "Ownique stores your wallet address, uploaded designs, agreement times, activity events for the dashboard, and reports. It never stores wallet secrets. Try It On mockups are made in the browser; only the optional AI-Enhanced Preview sends the photo and watermarked design to Cloudflare Workers AI, and Ownique doesn't save them, and chat messages are not saved. Anything on Solana is public.",
+    "Ownique stores your wallet address, uploaded designs, agreement times, activity events for the dashboard, and reports. It never stores wallet secrets. Try It On mockups are made in the browser; only the optional Generate AI Try-On sends the photo and watermarked design to an AI image service (Google Gemini or Cloudflare Workers AI), and Ownique doesn't save them, and chat messages are not saved. Anything on Solana is public.",
 };
 
 const lookupTerms = tool(async ({ topic }) => TERMS[topic], {

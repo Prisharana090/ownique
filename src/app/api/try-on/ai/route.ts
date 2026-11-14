@@ -5,6 +5,10 @@ import { connectDb, hasDb } from "@/lib/db";
 import { loadOriginal, watermark } from "@/lib/designImage";
 import { AiUsage } from "@/models/AiUsage";
 import { AiError, editWithFlux, hasCloudflareAi } from "@/lib/cloudflareAi";
+import { editWithGemini, geminiImageEnabled } from "@/lib/geminiImage";
+
+/** Which AI provider is active: Gemini (opt-in, billed) or Cloudflare Workers AI. */
+const provider = (): "gemini" | "cloudflare" | null => (geminiImageEnabled() ? "gemini" : hasCloudflareAi() ? "cloudflare" : null);
 import { logEvent } from "@/lib/events";
 
 export const maxDuration = 90;
@@ -26,21 +30,23 @@ const PROMPT =
   "contents into real objects (floral artwork stays printed on a vase and must not become real flowers). " +
   "Keep the same framing, camera angle and composition as image 0.";
 
-async function toRef(buf: Buffer) {
-  return sharp(buf).rotate().resize(512, 512, { fit: "inside" }).flatten({ background: "#ffffff" }).jpeg({ quality: 90 }).toBuffer();
+async function toRef(buf: Buffer, size = 512) {
+  return sharp(buf).rotate().resize(size, size, { fit: "inside" }).flatten({ background: "#ffffff" }).jpeg({ quality: 90 }).toBuffer();
 }
 
 /** GET → is the AI preview set up, and how many are left today (whole site)? */
 export async function GET() {
-  if (!hasCloudflareAi() || !hasDb()) return NextResponse.json({ available: false, remaining: 0 });
+  const p = provider();
+  if (!p || !hasDb()) return NextResponse.json({ available: false, remaining: 0, provider: null });
   await connectDb();
   const u = await AiUsage.findOne({ day: today() }).lean<{ count: number }>();
-  return NextResponse.json({ available: true, remaining: Math.max(0, DAILY_CAP - (u?.count ?? 0)) });
+  return NextResponse.json({ available: true, remaining: Math.max(0, DAILY_CAP - (u?.count ?? 0)), provider: p });
 }
 
 /** POST multipart: product (photo), guide (the browser-made mockup), designId → AI-generated image. */
 export async function POST(req: Request) {
-  if (!hasCloudflareAi()) return NextResponse.json({ error: "AI-Enhanced Preview isn't set up on this server yet.", code: "config" }, { status: 503 });
+  const active = provider();
+  if (!active) return NextResponse.json({ error: "AI try-on isn't set up on this server yet. Your manual mockup still works.", code: "config" }, { status: 503 });
   if (!hasDb()) return NextResponse.json({ error: "No database configured." }, { status: 503 });
 
   // Per-visitor limits: one at a time, 30s apart, 5 per day.
@@ -79,7 +85,8 @@ export async function POST(req: Request) {
     const custom = form.get("artwork");
     const useCustom = custom instanceof File && custom.size > 0 && custom.size <= 3 * 1024 * 1024 && TYPES.includes(custom.type);
     const art = await watermark(useCustom ? Buffer.from(await custom.arrayBuffer()) : d.bytes);
-    refs = await Promise.all([toRef(photo), toRef(art), toRef(Buffer.from(await guide.arrayBuffer()))]);
+    const refSize = active === "gemini" ? 1024 : 512; // Cloudflare FLUX accepts up to 512×512 inputs
+    refs = await Promise.all([toRef(photo, refSize), toRef(art, refSize), toRef(Buffer.from(await guide.arrayBuffer()), refSize)]);
     // Original photo at output size, and the print-area mask as a softly feathered alpha channel.
     base = await sharp(photo).rotate().resize(w, h, { fit: "fill" }).removeAlpha().toBuffer();
     alpha = await sharp(Buffer.from(await maskFile.arrayBuffer())).resize(w, h, { fit: "fill" }).greyscale().blur(2).extractChannel(0).raw().toBuffer();
@@ -95,7 +102,7 @@ export async function POST(req: Request) {
   state.busy = true; state.last = now; state.count += 1;
   clients.set(ip, state);
   try {
-    const image = await editWithFlux({ prompt: PROMPT, images: refs, width: w, height: h });
+    const image = active === "gemini" ? await editWithGemini(PROMPT, refs) : await editWithFlux({ prompt: PROMPT, images: refs, width: w, height: h });
     // Boundaries are enforced here, not by the prompt: the AI pixels are only kept inside the print area;
     // everything outside it is the untouched original photo.
     const rgb = await sharp(Buffer.from(image, "base64")).resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();

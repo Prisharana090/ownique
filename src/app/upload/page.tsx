@@ -1,0 +1,119 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
+
+const CATEGORIES = ["cup", "glasses", "shirt", "phone case", "tote", "other"];
+
+const CONFIRMATIONS = [
+  "I created this design myself, and it isn't copied from anyone else.",
+  "Once someone buys it, they own it completely.",
+  "After it sells, I won't sell, reuse, or re-upload it anywhere.",
+  "I'll always be credited as the original designer.",
+  "I agree to the Ownership Policy.",
+];
+
+export default function Upload() {
+  const router = useRouter();
+  const { publicKey } = useWallet();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("cup");
+  const [checked, setChecked] = useState<boolean[]>(CONFIRMATIONS.map(() => false));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const allChecked = checked.every(Boolean);
+  const ready = Boolean(publicKey && file && title && Number(price) > 0 && allChecked);
+
+  function pickFile(f: File | null) {
+    setFile(f);
+    setPreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ready || !file || !publicKey) return;
+    setBusy(true);
+    setError(null);
+    const form = new FormData();
+    form.append("image", file);
+    form.append("title", title);
+    form.append("price", price);
+    form.append("category", category);
+    form.append("designerWallet", publicKey.toBase58());
+    form.append("agreed", String(allChecked));
+    try {
+      const res = await fetch("/api/designs", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      router.push(`/design/${data.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2">
+      <div className="space-y-3">
+        <h1 className="text-3xl font-bold">Sell a design</h1>
+        <p className="text-stone-600">It sells once. You keep the credit forever.</p>
+        <label className="flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-stone-300 bg-white hover:border-violet-400">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Preview" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-stone-500">Click to choose an image (max 2MB)</span>
+          )}
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+        </label>
+      </div>
+
+      <div className="space-y-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+        <label className="block">
+          <span className="text-sm font-medium">Title</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Midnight Waves"
+            className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 outline-violet-500" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-sm font-medium">Price (SOL)</span>
+            <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.5"
+              className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 outline-violet-500" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Made for</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 capitalize">
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <fieldset className="space-y-2 rounded-xl bg-stone-50 p-4">
+          <legend className="mb-1 text-sm font-semibold">Before you list your design</legend>
+          {CONFIRMATIONS.map((text, i) => (
+            <label key={i} className="flex gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5 accent-violet-600" checked={checked[i]}
+                onChange={(e) => setChecked((c) => c.map((v, j) => (j === i ? e.target.checked : v)))} />
+              <span>
+                {i === 4 ? <>I agree to the <a href="/policy" target="_blank" className="underline">Ownership Policy</a>.</> : text}
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        {!publicKey && <p className="text-sm text-amber-700">Connect your wallet (top right) to sell.</p>}
+        {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+
+        <button disabled={!ready || busy}
+          className="w-full rounded-xl bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+          {busy ? "Listing… (Grok is writing your description ✨)" : "List My Design"}
+        </button>
+      </div>
+    </form>
+  );
+}

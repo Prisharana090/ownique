@@ -1,0 +1,18 @@
+Project: Ownique – HackPrinceton Fall 2026, Business & Enterprise track.
+A design marketplace WEBSITE where designers sell a design ONCE. The buyer gets full ownership;
+the designer keeps credit forever and can never resell it.
+
+Sponsor tools we MUST use (each one visible in the demo):
+Cursor, Grok (xAI), Gemini API, Solana devnet, MongoDB Atlas, Tiger Data,
+Vultr (hosting), GoDaddy Registry (domain).
+Stack: Next.js 15 (App Router, TypeScript, src/ folder), Tailwind v4, mongoose,
+@solana/wallet-adapter (Phantom, devnet).
+
+Already built (starter): wallet login, upload with confirmation checkboxes, Grok descriptions,
+shop, design page, policy page, exact-duplicate blocking (SHA-256),
+Solana ownership token (Metaplex Core, minted to a vault) + Buy & Own It flow with on-chain payment check.
+Next to build: Gemini copy detector + Try It On,
+Tiger Data dashboard, reports/admin, Vultr deploy.
+
+Rules: build small working pieces, keep code simple and commented,
+secrets only in .env.local, friendly error messages, clean rounded UI.

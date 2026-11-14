@@ -59,27 +59,43 @@ export async function isSameDesign(a: Img, b: Img): Promise<{ same: boolean; rea
   return { same: Boolean(json.same), reason: String(json.reason ?? "") };
 }
 
-/** Asks Gemini's image model to print the design naturally onto the product photo. */
-export async function renderTryOn(product: Img, design: Img): Promise<{ data: string; mimeType: string }> {
-  const parts = await generate(
-    IMAGE_MODEL,
-    [
-      {
-        text:
-          "The first image is a product photo. The second image is a design. Print the design naturally onto the " +
-          "product so it follows the product's shape, curves, lighting and shadows, like a real printed product. " +
-          "Keep everything else in the photo the same.",
-      },
-      imgPart(product),
-      imgPart(design),
-    ],
-    { responseModalities: ["TEXT", "IMAGE"] }
-  );
-  for (const p of parts) {
-    if (p.inlineData) return { data: p.inlineData.data, mimeType: p.inlineData.mimeType };
-    if (p.inline_data) return { data: p.inline_data.data, mimeType: p.inline_data.mime_type };
+/**
+ * Asks Gemini's image model to apply the artwork to the product surface, using the user's placement guide.
+ * Tries the configured image model, then a fallback, before giving up.
+ */
+export async function renderTryOn(
+  product: Img, artwork: Img, guide: Img,
+  p: { x: number; y: number; size: number; rotation: number }
+): Promise<{ data: string; mimeType: string }> {
+  const prompt =
+    "You are editing a product photo to preview a printed design.\n" +
+    "Image 1: the ORIGINAL product photo. Image 2: the ARTWORK (a flat graphic). Image 3: a rough placement guide " +
+    "showing where the customer wants the artwork.\n" +
+    `Placement: artwork centre at ${Math.round(p.x)}% from the left and ${Math.round(p.y)}% from the top of the photo, ` +
+    `about ${Math.round(p.size)}% of the photo width, rotated ${Math.round(p.rotation)} degrees.\n` +
+    "Apply the artwork to the product's SURFACE as if printed on it: wrap it to the product's shape and curvature, " +
+    "and match the photo's lighting, shadows and texture. Treat the artwork strictly as a flat printed graphic: do NOT " +
+    "turn anything in it into real 3D objects (for example, floral artwork must appear printed on a vase, never as real " +
+    "flowers inside it). Keep the artwork's colours, shapes and any watermark text as close to Image 2 as possible. " +
+    "Do not change the product's shape, the background, the framing or anything else in the photo. Return one image.";
+  const parts = [{ text: prompt }, imgPart(product), imgPart(artwork), imgPart(guide)];
+  const models = [IMAGE_MODEL, "gemini-2.5-flash-image"].filter((m, i, a) => a.indexOf(m) === i);
+  let last: unknown;
+  for (const model of models) {
+    try {
+      const out = await generate(model, parts, { responseModalities: ["TEXT", "IMAGE"] });
+      for (const part of out) {
+        if (part.inlineData) return { data: part.inlineData.data, mimeType: part.inlineData.mimeType };
+        if (part.inline_data) return { data: part.inline_data.data, mimeType: part.inline_data.mime_type };
+      }
+      last = new Error("Gemini didn't return an image.");
+    } catch (err) {
+      last = err;
+      const status = (err as { status?: number }).status;
+      if (status !== 404 && status !== 503) throw err;
+    }
   }
-  throw new Error("Gemini didn't return an image. Try again.");
+  throw last;
 }
 
 /**

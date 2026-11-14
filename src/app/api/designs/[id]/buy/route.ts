@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Atomic: only succeeds if it's still listed (stops two buyers at the same moment).
   const sold = await Design.findOneAndUpdate(
     { _id: id, status: "listed" },
-    { status: "sold", ownerWallet: buyerWallet, txSignature: signature, soldAt: new Date() },
+    { status: "sold", ownerWallet: buyerWallet, txSignature: signature, paymentMethod: "sol", soldAt: new Date() },
     { new: true }
   );
   if (!sold) return NextResponse.json({ error: "Sorry, someone else just bought it." }, { status: 409 });
@@ -53,6 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (hasVault() && sold.mintAddress) {
     try {
       transferSignature = await transferDesignToken(sold.mintAddress, buyerWallet);
+      await Design.updateOne({ _id: id }, { tokenTransferSignature: transferSignature });
     } catch (err) {
       console.error("Token transfer failed — retry from the admin page:", err);
     }

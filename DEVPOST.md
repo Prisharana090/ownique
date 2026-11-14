@@ -7,6 +7,24 @@ Copy each section into Devpost. Replace anything in [brackets].
 ## Tagline
 One design. One owner. Credit forever.
 
+## 🏁 Tracks we're entering
+**Main track:** Business & Enterprise
+
+**Sponsor tracks (opt into all of these on Devpost):**
+| Track | Why Ownique fits |
+|---|---|
+| Amazon: Best Practical AI Innovation | Practical AI that protects real creators: Ask Ownique checks designs for brand look-alikes before listing; the copy detector blocks stolen re-uploads; Try It On previews products |
+| LangChain: Best use of Deep Agents | Ask Ownique is a Deep Agent with 5 custom tools: search_designs, get_design, get_ownership_record, lookup_terms, get_platform_stats, plus image checks |
+| Capital One: Best use of Nessie | "Pay with bank" checkout: buyers without crypto pay the designer bank-to-bank through Nessie practice accounts, and ownership still moves on Solana |
+| MLH: Best Use of Solana | Wallet identity, on-chain payment verification, 1-of-1 Metaplex Core ownership tokens with the creator recorded forever |
+| MLH: Best Use of MongoDB Atlas | Users, designs (with images), reports |
+| MLH: Best Use of Tiger Data | Hypertable of every event + per-minute continuous aggregate powering a live dashboard |
+| MLH: Best Use of Gemini API | Copy detector judgment + Try It On realistic previews |
+| MLH: SpaceXSI raffle (Cursor + Grok Bot) | Grok powers Ask Ownique + descriptions; Grok Bot GitHub Action writes our changelog |
+| MLH: Best Use of Vultr | Production hosting (Docker + Nginx + HTTPS) |
+| MLH: Best Domain from GoDaddy Registry | [yourdomain] |
+| Best Rookie Hack | (only if this is your first hackathon) |
+
 ## Inspiration
 Designers sell their work online and lose control of it. The same design gets sold again and again, copied, or reposted without credit. Buyers like small sellers who want a unique look for *their* product can never be sure no one else has the same design. We wanted a marketplace where **owning a design actually means something**.
 
@@ -40,20 +58,25 @@ Ownique is a design marketplace where **every design sells exactly once**.
 | Tool | How we used it |
 |---|---|
 | Cursor | Core AI coding agent for the whole build (see `.cursorrules`) |
-| Grok Bot | Writes design descriptions in-app; GitHub Action summarizes every push into `CHANGELOG.md` + Discord |
+| LangChain Deep Agents | Ask Ownique is a Deep Agent with Ownique-specific tools |
+| Grok Bot | Powers the Ask Ownique agent (incl. brand look-alike checks), writes design descriptions in-app; GitHub Action summarizes every push into `CHANGELOG.md` + Discord |
 | Gemini API | Judges whether two images are the same design; renders realistic Try It On previews |
 | Solana | Wallet identity, verified SOL payments, 1-of-1 Metaplex Core ownership tokens with on-chain creator credit |
 | MongoDB Atlas | Users, designs, images, reports |
+| Capital One Nessie | "Pay with bank" checkout with practice bank accounts |
 | Tiger Data | Hypertable of events + continuous aggregate → live dashboard |
 | Vultr | Production hosting (Docker + Nginx + Certbot) |
 | GoDaddy Registry | [yourdomain] |
 
 ## Trust & safety
-- Designers and buyers each tick 5 clear confirmations before listing or buying.
+- Designers and buyers each tick 5 clear confirmations before listing or buying, and designers **sign their originality agreement with their wallet**, so nobody can list designs in someone else's name.
 - Payments are verified on-chain, and each payment can only be used once.
 - Watermarked previews; the full file goes only to the verified owner.
+- Every design has a printable **Certificate of Creation**: creator wallet, exact time, file fingerprint, Solana ownership token, current owner, and payment record.
 - Copy detection at three levels: exact file, look-alike (perceptual hash), and AI judgment (Gemini).
 - A Report button hides a design immediately while it's reviewed.
+- **Ask Ownique**, a Grok-powered chat assistant, answers questions and checks designs for look-alikes of famous brand logos and characters before they're listed.
+- Plain-language **Copyright, Trademark & Privacy** terms on the policy page.
 
 ## Challenges we ran into
 [Write 2–3 real ones, e.g. getting the ownership token transfer and payment check to work together, tuning the copy detector so resized copies are caught but different designs aren't.]
@@ -75,6 +98,9 @@ Ownique is a design marketplace where **every design sells exactly once**.
 - **Utility:** small sellers get unique designs; designers get paid and keep their name on their work.
 - **Charity:** protects independent and student artists from theft and uncredited reuse.
 - **Avidity:** built end to end in 36 hours, using 8 sponsor tools in real, visible ways.
+
+## Credits
+See the **Credits** section in our README for every library and service we used.
 
 ## Links
 - Live site: [https://yourdomain]

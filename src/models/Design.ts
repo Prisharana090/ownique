@@ -18,8 +18,12 @@ const DesignSchema = new Schema(
     description: { type: String, default: "" },
     tags: { type: [String], default: [] },
     describedByGrok: { type: Boolean, default: false },
-    mintAddress: { type: String, default: null }, // TODO: Solana NFT (Prompt 7)
-    txSignature: { type: String, default: null }, // TODO: purchase tx (Prompt 8)
+    mintAddress: { type: String, default: null }, // Solana ownership token address
+    txSignature: { type: String, default: null }, // Solana payment signature (crypto checkout)
+    paymentMethod: { type: String, enum: ["sol", "bank", null], default: null },
+    nessieTransferId: { type: String, default: null }, // Capital One Nessie transfer (bank checkout)
+    priceUsd: { type: Number, default: null },
+    tokenTransferSignature: { type: String, default: null },
     soldAt: { type: Date, default: null },
     agreedAt: { type: Date, required: true }, // when the designer ticked all checkboxes
   },

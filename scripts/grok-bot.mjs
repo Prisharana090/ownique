@@ -3,7 +3,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const { XAI_API_KEY, DISCORD_WEBHOOK_URL, BEFORE, AFTER, GROK_MODEL = "grok-4" } = process.env;
+const { XAI_API_KEY, DISCORD_WEBHOOK_URL, BEFORE, AFTER, GROK_MODEL = "grok-4.7" } = process.env;
 if (!XAI_API_KEY) {
   console.log("XAI_API_KEY secret not set — skipping Grok Bot.");
   process.exit(0);

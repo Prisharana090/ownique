@@ -2,11 +2,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
+import bs58 from "bs58";
 
 const CATEGORIES = ["cup", "glasses", "shirt", "phone case", "tote", "other"];
 
 const CONFIRMATIONS = [
-  "I created this design myself, and it isn't copied from anyone else.",
+  "I created this design myself. It isn't copied, and it doesn't use any brand logo, trademark or character.",
   "Once someone buys it, they own it completely.",
   "After it sells, I won't sell, reuse, or re-upload it anywhere.",
   "I'll always be credited as the original designer.",
@@ -15,7 +16,7 @@ const CONFIRMATIONS = [
 
 export default function Upload() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { publicKey, signMessage } = useWallet();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -36,8 +37,19 @@ export default function Upload() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ready || !file || !publicKey) return;
+    if (!signMessage) return setError("Your wallet can't sign messages. Try Phantom.");
     setBusy(true);
     setError(null);
+    // ✍️ Sign the agreement with the wallet (free, no transaction)
+    let message: string, signature: string;
+    try {
+      message = `Ownique: I created this design, I agree to the terms, and I list it for sale at ${Date.now()}`;
+      signature = bs58.encode(await signMessage(new TextEncoder().encode(message)));
+    } catch {
+      setError("You need to approve the signature in your wallet to list the design.");
+      setBusy(false);
+      return;
+    }
     const form = new FormData();
     form.append("image", file);
     form.append("title", title);
@@ -45,6 +57,8 @@ export default function Upload() {
     form.append("category", category);
     form.append("designerWallet", publicKey.toBase58());
     form.append("agreed", String(allChecked));
+    form.append("message", message);
+    form.append("signature", signature);
     try {
       const res = await fetch("/api/designs", { method: "POST", body: form });
       const data = await res.json();
@@ -100,18 +114,21 @@ export default function Upload() {
               <input type="checkbox" className="mt-0.5 accent-violet-600" checked={checked[i]}
                 onChange={(e) => setChecked((c) => c.map((v, j) => (j === i ? e.target.checked : v)))} />
               <span>
-                {i === 4 ? <>I agree to the <a href="/policy" target="_blank" className="underline">Ownership Policy</a>.</> : text}
+                {i === 4 ? <>I agree to the <a href="/policy" target="_blank" className="underline">Ownership, Copyright &amp; Privacy terms</a>.</> : text}
               </span>
             </label>
           ))}
         </fieldset>
 
+        <p className="text-xs text-stone-500">
+          Not sure your design is original? Attach it to <b>💬 Ask Ownique</b> (bottom right) for a quick brand look-alike check.
+        </p>
         {!publicKey && <p className="text-sm text-amber-700">Connect your wallet (top right) to sell.</p>}
         {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
         <button disabled={!ready || busy}
           className="w-full rounded-xl bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
-          {busy ? "Listing… (Grok is writing your description ✨)" : "List My Design"}
+          {busy ? "Listing… (sign in your wallet, then Grok writes your description ✨)" : "Sign & List My Design"}
         </button>
       </div>
     </form>

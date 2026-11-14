@@ -14,7 +14,7 @@ export async function describeWithGrok(title: string, category: string) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: process.env.GROK_MODEL || "grok-4",
+        model: process.env.GROK_MODEL || "grok-4.7",
         messages: [
           {
             role: "system",

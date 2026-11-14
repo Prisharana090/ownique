@@ -10,6 +10,8 @@
     "seed": "node --env-file=.env.local scripts/seed.mjs"
   },
   "dependencies": {
+    "@langchain/core": "^1.4.1",
+    "@langchain/xai": "^1.5.6",
     "@metaplex-foundation/mpl-core": "^1.10.0",
     "@metaplex-foundation/umi": "^1.6.0",
     "@metaplex-foundation/umi-bundle-defaults": "^1.6.0",
@@ -18,6 +20,8 @@
     "@solana/wallet-adapter-react-ui": "^0.9.40",
     "@solana/web3.js": "^1.99.0",
     "bs58": "^6.0.0",
+    "deepagents": "^1.16.5",
+    "langchain": "^1.6.6",
     "mongoose": "^9.12.1",
     "next": "15.5.29",
     "pg": "^8.23.1",
@@ -26,7 +30,8 @@
     "recharts": "^3.10.1",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -9,7 +9,8 @@ export async function GET() {
   try {
     return NextResponse.json({ configured: true, ...(await getStats()) });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ configured: true, error: "Couldn't reach Tiger Data." }, { status: 502 });
+    console.error("Tiger Data error:", err);
+    const detail = process.env.NODE_ENV === "development" ? ` (${(err as Error).message})` : "";
+    return NextResponse.json({ configured: true, error: `Couldn't reach Tiger Data.${detail}` }, { status: 502 });
   }
 }

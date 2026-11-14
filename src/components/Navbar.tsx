@@ -14,7 +14,7 @@ const links = [
   { href: "/upload", label: "Sell a design" },
   { href: "/try-on", label: "Try It On" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/policy", label: "How it works" },
+  { href: "/policy", label: "How it works & terms" },
 ];
 
 export default function Navbar() {

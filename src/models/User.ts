@@ -6,6 +6,9 @@ const UserSchema = new Schema(
     username: { type: String },
     email: { type: String },
     verified: { type: Boolean, default: false },
+    // Capital One Nessie practice bank account (for "Pay with bank")
+    nessieCustomerId: { type: String, default: null },
+    nessieAccountId: { type: String, default: null },
   },
   { timestamps: true }
 );

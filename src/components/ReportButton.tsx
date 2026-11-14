@@ -29,7 +29,7 @@ export default function ReportButton({ designId }: { designId: string }) {
     <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-4">
       <p className="text-sm font-semibold">What&apos;s wrong?</p>
       <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
-        placeholder="e.g. This is my design, it was stolen from my Instagram"
+        placeholder="e.g. This is my artwork, or it copies a brand's logo"
         className="w-full rounded-lg border border-stone-300 p-2 text-sm" />
       <div className="flex gap-2">
         <button onClick={send} disabled={reason.trim().length < 5}

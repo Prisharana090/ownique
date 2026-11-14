@@ -9,8 +9,12 @@ const g = globalThis as unknown as { _tigerPool?: Pool; _tigerReady?: Promise<vo
 export const hasTiger = () => Boolean(process.env.TIGER_DATABASE_URL);
 
 function pool() {
+  // sslmode in the URL would override our ssl setting (and fail behind some campus/antivirus networks),
+  // so we remove it and keep the connection encrypted with our own ssl option.
+  const url = new URL(process.env.TIGER_DATABASE_URL!);
+  url.searchParams.delete("sslmode");
   g._tigerPool ??= new Pool({
-    connectionString: process.env.TIGER_DATABASE_URL,
+    connectionString: url.toString(),
     ssl: { rejectUnauthorized: false },
     max: 5,
   });
@@ -41,7 +45,10 @@ function ready() {
     } catch (err) {
       console.warn("TimescaleDB features unavailable, using plain table:", (err as Error).message);
     }
-  })();
+  })().catch((err) => {
+    g._tigerReady = undefined; // don't cache a failure: try again on the next request
+    throw err;
+  });
   return g._tigerReady;
 }
 

@@ -15,6 +15,7 @@ type D = {
   _id: string; title: string; price: number; category: string; status: string;
   designerWallet: string; ownerWallet?: string | null; description: string; tags: string[];
   describedByGrok: boolean; soldAt?: string | null; txSignature?: string | null; mintAddress?: string | null;
+  paymentMethod?: string | null; priceUsd?: number | null; tokenTransferSignature?: string | null;
 };
 
 export default async function DesignPage({ params }: { params: Promise<{ id: string }> }) {
@@ -62,6 +63,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
           <div className="rounded-2xl bg-stone-900 p-5 text-sm text-white">
             <b>Owned by</b> {short(d.ownerWallet)} · <b>Designed by</b> {short(d.designerWallet)}
             {d.soldAt && <> · <b>Sold</b> {new Date(d.soldAt).toLocaleDateString()}</>}
+            {d.paymentMethod === "bank" && <> · <b>Paid by bank</b> (Capital One){d.priceUsd ? ` $${d.priceUsd}` : ""}</>}
             {d.txSignature && (
               <> · <a className="underline" target="_blank" href={`https://explorer.solana.com/tx/${d.txSignature}?cluster=devnet`}>View on Solana</a></>
             )}
@@ -84,6 +86,9 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
             ⛓️ Ownership token on Solana: {short(d.mintAddress)}
           </a>
         )}
+        <Link href={`/certificate/${d._id}`} className="block text-sm font-semibold text-violet-700 hover:underline">
+          📜 View Certificate of Creation
+        </Link>
         <ReportButton designId={d._id} />
       </div>
     </div>

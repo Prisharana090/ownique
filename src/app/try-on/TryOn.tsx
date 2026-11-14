@@ -3,7 +3,8 @@
 // Upload a product photo, place the design (drag, resize, rotate, perspective corners), then Create Preview.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { maskCanvas, renderMockup, type Blend, type Pt } from "@/lib/mockup";
+import { renderMockup, type Blend, type Pt } from "@/lib/mockup";
+import { detectProduct } from "@/lib/productMask";
 import { DEFAULT_COLORS, customizeArt, isCustomized, type ColorSettings } from "@/lib/artColor";
 import DesignColors from "./DesignColors";
 
@@ -53,7 +54,48 @@ export default function TryOn() {
   // Print area: an outline of the product surface (photo pixels). The design is clipped to it everywhere.
   const [area, setArea] = useState<Pt[]>([]);
   const [areaMode, setAreaMode] = useState<"off" | "draw" | "edit">("off");
-  const mask = (k: number) => (area.length >= 3 && areaMode !== "draw" ? area.map((p) => ({ x: p.x * k, y: p.y * k })) : undefined);
+  // Automatic product detection (on by default): the design can never leave the product.
+  const [autoOn, setAutoOn] = useState(true);
+  const [sensitivity, setSensitivity] = useState(30);
+  const [showArea, setShowArea] = useState(false);
+  const product = useMemo(() => (photo ? detectProduct(photo, sensitivity) : null), [photo, sensitivity]);
+  /** The allowed print region as a mask canvas: detected product ∩ hand-drawn outline (either may be absent). */
+  const allowed = useMemo(() => {
+    if (!photo) return null;
+    const useAuto = autoOn && product?.ok;
+    const useArea = area.length >= 3 && areaMode !== "draw";
+    if (!useAuto && !useArea) return null;
+    const base = useAuto ? product!.canvas : null;
+    const c = document.createElement("canvas");
+    c.width = base?.width ?? Math.round(Math.min(1, 320 / Math.max(photo.naturalWidth, photo.naturalHeight)) * photo.naturalWidth);
+    c.height = base?.height ?? Math.round(Math.min(1, 320 / Math.max(photo.naturalWidth, photo.naturalHeight)) * photo.naturalHeight);
+    const x = c.getContext("2d")!;
+    if (base) x.drawImage(base, 0, 0);
+    else { x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); }
+    if (useArea) {
+      const sx = c.width / photo.naturalWidth, sy = c.height / photo.naturalHeight;
+      x.globalCompositeOperation = "destination-in";
+      x.beginPath();
+      area.forEach((p, i) => (i ? x.lineTo(p.x * sx, p.y * sy) : x.moveTo(p.x * sx, p.y * sy)));
+      x.closePath();
+      x.fillStyle = "#fff";
+      x.fill();
+    }
+    return c;
+  }, [photo, product, autoOn, area, areaMode]);
+  const mask = () => allowed ?? undefined;
+  // Pink tint over everything OUTSIDE the allowed region (only when "Show print area" is on).
+  const areaOverlay = useMemo(() => {
+    if (!showArea || !allowed) return null;
+    const c = document.createElement("canvas");
+    c.width = allowed.width; c.height = allowed.height;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "rgba(196,108,141,0.45)";
+    x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "destination-out";
+    x.drawImage(allowed, 0, 0);
+    return c.toDataURL();
+  }, [showArea, allowed]);
 
   // Designs list; carry over ?design= from the design page.
   useEffect(() => {
@@ -105,14 +147,14 @@ export default function TryOn() {
       const k = (boxW * (window.devicePixelRatio || 1)) / photo.naturalWidth;
       try {
         renderMockup(canvas.current!, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
-          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12, mask: mask(k), feather: 1.5 * (window.devicePixelRatio || 1) });
+          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12, mask: mask(), feather: 1.5 * (window.devicePixelRatio || 1) });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Preview failed.");
       }
     });
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photo, art, artView, place, opacity, blend, boxW, corners, area, areaMode]);
+  }, [photo, art, artView, place, opacity, blend, boxW, corners, allowed]);
 
   async function pickFile(f: File | null) {
     setError(null);
@@ -194,7 +236,7 @@ export default function TryOn() {
       const k = Math.min(1, 2400 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const out = document.createElement("canvas");
       renderMockup(out, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
-        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24, mask: mask(k), feather: 2 });
+        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24, mask: mask(), feather: 2 });
       const blob = await new Promise<Blob | null>((ok) => out.toBlob(ok, "image/jpeg", 0.92));
       if (!blob) throw new Error("Couldn't create the preview.");
       if (result) URL.revokeObjectURL(result.url);
@@ -215,7 +257,7 @@ export default function TryOn() {
     try {
       const k = Math.min(1, 512 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const g = document.createElement("canvas");
-      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16, mask: mask(k), feather: 1 });
+      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16, mask: mask(), feather: 1 });
       const guide = await new Promise<Blob | null>((ok) => g.toBlob(ok, "image/jpeg", 0.9));
       if (!guide) throw new Error("Couldn't prepare the mockup.");
       const form = new FormData();
@@ -224,8 +266,28 @@ export default function TryOn() {
       form.append("designId", designId);
       // Where the AI result is allowed to show: the print area, or (if none) the design's own outline.
       const mk = Math.min(1, 1024 / Math.max(photo.naturalWidth, photo.naturalHeight));
-      const region = (area.length >= 3 ? area : corners(place)).map((p) => ({ x: p.x * mk, y: p.y * mk }));
-      const maskBlob = await new Promise<Blob | null>((ok) => maskCanvas(region, photo.naturalWidth * mk, photo.naturalHeight * mk).toBlob(ok, "image/png"));
+      // AI pixels are only kept where the design sits AND inside the allowed print region (white on black).
+      const mw = Math.round(photo.naturalWidth * mk), mh = Math.round(photo.naturalHeight * mk);
+      const mc = document.createElement("canvas");
+      mc.width = mw; mc.height = mh;
+      const mx = mc.getContext("2d")!;
+      const quad = corners(place).map((p) => ({ x: p.x * mk, y: p.y * mk }));
+      mx.fillStyle = "#fff";
+      mx.strokeStyle = "#fff";
+      mx.lineWidth = Math.max(4, mw * 0.03); // a little room around the design for shading
+      mx.beginPath();
+      quad.forEach((p, i) => (i ? mx.lineTo(p.x, p.y) : mx.moveTo(p.x, p.y)));
+      mx.closePath();
+      mx.fill();
+      mx.stroke();
+      if (allowed) {
+        mx.globalCompositeOperation = "destination-in";
+        mx.drawImage(allowed, 0, 0, mw, mh);
+      }
+      mx.globalCompositeOperation = "destination-over";
+      mx.fillStyle = "#000";
+      mx.fillRect(0, 0, mw, mh);
+      const maskBlob = await new Promise<Blob | null>((ok) => mc.toBlob(ok, "image/png"));
       if (maskBlob) form.append("mask", maskBlob, "mask.png");
       // Send the customized (recolored / background-hidden) artwork, still watermarked, when the user changed it.
       if (isCustomized(colors)) {
@@ -324,6 +386,10 @@ export default function TryOn() {
                   )}
                 </>
               )}
+              {areaOverlay && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={areaOverlay} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full rounded-2xl" />
+              )}
               {area.length > 0 && (
                 <svg viewBox={`0 0 ${nw} ${nh}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden rounded-2xl">
                   {areaMode === "draw" && area.length < 3
@@ -341,12 +407,28 @@ export default function TryOn() {
 
           {photo && (
             <div className="mt-3 space-y-2 rounded-2xl border border-[#ece3d9] bg-white/80 p-3 text-sm">
-              <p className="font-medium text-stone-800">Print area {area.length >= 3 && areaMode === "off" ? <span className="text-xs font-normal text-emerald-700">✓ design is clipped to it</span> : null}</p>
+              <p className="font-medium text-stone-800">Print area {allowed && areaMode !== "draw" ? <span className="text-xs font-normal text-emerald-700">✓ the design can&apos;t leave it</span> : null}</p>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="h-4 w-4 accent-violet-600" checked={autoOn} onChange={(e) => setAutoOn(e.target.checked)} />
+                Detect the product automatically
+                {autoOn && product && (product.ok
+                  ? <span className="text-xs text-stone-500">(found it)</span>
+                  : <span className="text-xs text-red-700">(couldn&apos;t find its edges: adjust sensitivity or outline it below)</span>)}
+              </label>
+              {autoOn && (
+                <label className="block text-xs text-stone-600">Edge sensitivity: {sensitivity}
+                  <input type="range" min={5} max={70} value={sensitivity} onChange={(e) => setSensitivity(+e.target.value)} className="block w-full accent-violet-600" />
+                </label>
+              )}
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="h-4 w-4 accent-violet-600" checked={showArea} onChange={(e) => setShowArea(e.target.checked)} disabled={!allowed} />
+                Show print area (pink = blocked)
+              </label>
               <p className="text-xs text-stone-500">
                 {areaMode === "draw"
                   ? `Tap around the edge of the surface to print on (for a hoodie: just the front panel). ${area.length} point${area.length === 1 ? "" : "s"} so far.`
                   : areaMode === "edit" ? "Drag the pink points to adjust the outline."
-                  : "Outline the part of the product the design may appear on, so it never spills onto the background, hands or hood."}
+                  : "Optional: outline a smaller part (for a hoodie, just the front panel) to keep the design off hands, the hood or seams."}
               </p>
               <div className="flex flex-wrap gap-2">
                 {areaMode === "draw" ? (

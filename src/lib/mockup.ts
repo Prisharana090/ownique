@@ -57,7 +57,7 @@ export type Blend = "source-over" | "multiply" | "overlay" | "soft-light" | "scr
 export function renderMockup(
   canvas: HTMLCanvasElement, photo: CanvasImageSource, art: HTMLImageElement | HTMLCanvasElement,
   quad: Pt[], width: number, height: number,
-  opts: { opacity: number; blend: Blend; grid?: number; mask?: Pt[]; feather?: number }
+  opts: { opacity: number; blend: Blend; grid?: number; mask?: Pt[] | HTMLCanvasElement; feather?: number }
 ) {
   canvas.width = Math.round(width);
   canvas.height = Math.round(height);
@@ -85,13 +85,19 @@ export function renderMockup(
     }
   }
   // Print area: keep only the part of the artwork inside the outlined product surface (soft edge).
-  if (opts.mask && opts.mask.length >= 3) {
+  // A polygon (hand-drawn outline) or a mask canvas (detected product, opaque = allowed), scaled to the output.
+  if (opts.mask && (opts.mask instanceof HTMLCanvasElement || opts.mask.length >= 3)) {
     lctx.save();
     lctx.globalCompositeOperation = "destination-in";
     if (opts.feather) lctx.filter = `blur(${opts.feather}px)`;
-    tracePolygon(lctx, opts.mask);
-    lctx.fillStyle = "#000";
-    lctx.fill();
+    if (opts.mask instanceof HTMLCanvasElement) {
+      lctx.imageSmoothingEnabled = true;
+      lctx.drawImage(opts.mask, 0, 0, layer.width, layer.height);
+    } else {
+      tracePolygon(lctx, opts.mask);
+      lctx.fillStyle = "#000";
+      lctx.fill();
+    }
     lctx.restore();
   }
   ctx.save();

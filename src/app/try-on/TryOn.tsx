@@ -10,6 +10,7 @@ type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const LABEL = "Product mockup—final appearance may vary.";
+const AI_LABEL = "AI-generated preview—details and final appearance may vary.";
 const BLENDS: [Blend, string][] = [
   ["multiply", "Multiply (printed look)"], ["source-over", "Normal"], ["overlay", "Overlay"],
   ["soft-light", "Soft light"], ["screen", "Screen (light products)"], ["darken", "Darken"],
@@ -28,6 +29,7 @@ export default function TryOn() {
   const [designId, setDesignId] = useState(params.get("design") ?? "");
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [art, setArt] = useState<HTMLImageElement | null>(null);
   const [place, setPlace] = useState<Place | null>(null);
   const [opacity, setOpacity] = useState(90);
@@ -36,6 +38,10 @@ export default function TryOn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [boxW, setBoxW] = useState(0);
+  const [ai, setAi] = useState<{ available: boolean; remaining: number } | null>(null);
+  const [aiResult, setAiResult] = useState<{ url: string; original: string; designId: string } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const drag = useRef<{ mode: "move" | "corner" | "rotate" | "resize"; i?: number; p0: Pt; s0: Place } | null>(null);
@@ -47,6 +53,7 @@ export default function TryOn() {
       setDesigns(list);
       setDesignId((cur) => (cur && list.some((d) => d._id === cur) ? cur : list[0]?._id ?? ""));
     }).catch(() => setError("Couldn't load designs. Please refresh."));
+    fetch("/api/try-on/ai").then((r) => r.json()).then(setAi).catch(() => setAi({ available: false, remaining: 0 }));
   }, []);
 
   // Watermarked preview artwork only (same origin, so the canvas can export it). Never the private original.
@@ -99,6 +106,7 @@ export default function TryOn() {
   async function pickFile(f: File | null) {
     setError(null);
     setResult(null);
+    setAiResult(null);
     if (!f) return;
     if (!TYPES.includes(f.type)) return setError("Please choose a JPG, PNG or WebP photo.");
     if (f.size > MAX_BYTES) return setError("Photo must be under 10MB.");
@@ -108,6 +116,7 @@ export default function TryOn() {
       if (photoUrl) URL.revokeObjectURL(photoUrl);
       setPhoto(img);
       setPhotoUrl(url);
+      setPhotoFile(f);
     } catch {
       URL.revokeObjectURL(url);
       setError("That file couldn't be opened as an image. Try another photo.");
@@ -167,6 +176,33 @@ export default function TryOn() {
       setError(e instanceof Error ? e.message : "Couldn't create the preview. Please try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Optional: Cloudflare Workers AI makes a realistic version from the photo, the watermarked art and our mockup. */
+  async function aiPreview(file: File | null) {
+    if (!file || !photo || !art || !place || !photoUrl || aiBusy) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const k = Math.min(1, 512 / Math.max(photo.naturalWidth, photo.naturalHeight));
+      const g = document.createElement("canvas");
+      renderMockup(g, photo, art, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16 });
+      const guide = await new Promise<Blob | null>((ok) => g.toBlob(ok, "image/jpeg", 0.9));
+      if (!guide) throw new Error("Couldn't prepare the mockup.");
+      const form = new FormData();
+      form.append("product", file);
+      form.append("guide", guide, "guide.jpg");
+      form.append("designId", designId);
+      const res = await fetch("/api/try-on/ai", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.image) throw new Error(data.error || "The AI preview couldn't be created.");
+      setAiResult({ url: data.image, original: photoUrl, designId });
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "The AI preview couldn't be created.");
+    } finally {
+      setAiBusy(false);
+      fetch("/api/try-on/ai").then((r) => r.json()).then(setAi).catch(() => {});
     }
   }
 
@@ -276,31 +312,54 @@ export default function TryOn() {
         </div>
       </section>
 
-      {result && (
-        <section className="space-y-3">
-          <div className="grid gap-4 md:grid-cols-2">
-            <figure className="space-y-2">
-              <figcaption className="text-sm font-semibold text-stone-600">Original Photo</figcaption>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={result.original} alt="Your original product photo" className="w-full rounded-2xl border border-stone-200 bg-white object-contain" />
-            </figure>
-            <figure className="space-y-2">
-              <figcaption className="text-sm font-semibold text-violet-800">Product Mockup</figcaption>
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={result.url} alt="Product mockup" className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/designs/${result.designId}/image`} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
-                  className="absolute right-3 top-3 h-14 w-14 rounded-xl border-2 border-white object-cover shadow-md sm:h-16 sm:w-16" />
-              </div>
-            </figure>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <p className="text-xs font-medium text-stone-500">{LABEL}</p>
-            <a href={result.url} download="ownique-mockup.jpg" className="text-xs font-semibold text-violet-700 underline">Download mockup</a>
-          </div>
-        </section>
-      )}
+      {result && <Compare r={result} title="Product Mockup" label={LABEL} download selected={selected} />}
+
+      <section className="space-y-3 rounded-3xl border border-violet-200 bg-violet-50/50 p-5">
+        <h2 className={step}>Optional: AI-Enhanced Preview</h2>
+        <p className="text-sm text-stone-600">
+          This sends your product photo, the design&apos;s watermarked preview and your mockup to Cloudflare Workers AI to create a
+          more realistic image. Nothing is saved by Ownique. Don&apos;t use photos with people or private information.
+        </p>
+        {ai && !ai.available && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">AI-Enhanced Preview isn&apos;t available right now. Your manual mockup above still works.</p>}
+        {ai?.available && <p className="text-xs text-stone-500">AI previews left today (whole site): {ai.remaining}</p>}
+        <button onClick={() => aiPreview(photoFile)} disabled={!photoFile || !place || aiBusy || !ai?.available || ai.remaining <= 0}
+          className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
+          {aiBusy ? "Creating AI preview… (up to a minute)" : "AI-Enhanced Preview"}
+        </button>
+        {aiError && !aiBusy && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{aiError}</p>}
+      </section>
+
+      {aiResult && <Compare r={aiResult} title="AI Try-On" label={AI_LABEL} selected={selected} />}
     </div>
+  );
+}
+
+function Compare({ r, title, label, download, selected }: {
+  r: { url: string; original: string; designId: string }; title: string; label: string; download?: boolean; selected?: D;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="grid gap-4 md:grid-cols-2">
+        <figure className="space-y-2">
+          <figcaption className="text-sm font-semibold text-stone-600">Original Photo</figcaption>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={r.original} alt="Your original product photo" className="w-full rounded-2xl border border-stone-200 bg-white object-contain" />
+        </figure>
+        <figure className="space-y-2">
+          <figcaption className="text-sm font-semibold text-violet-800">{title}</figcaption>
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={r.url} alt={title} className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/designs/${r.designId}/image`} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
+              className="absolute right-3 top-3 h-14 w-14 rounded-xl border-2 border-white object-cover shadow-md sm:h-16 sm:w-16" />
+          </div>
+        </figure>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <p className="text-xs font-medium text-stone-500">{label}</p>
+        {download && <a href={r.url} download="ownique-mockup.jpg" className="text-xs font-semibold text-violet-700 underline">Download mockup</a>}
+      </div>
+    </section>
   );
 }

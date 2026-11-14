@@ -84,7 +84,7 @@ const privacy: Section[] = [
       "Activity like views, try-ons and sales, used only to power the live dashboard.",
       "Reports you send, so we can review them.",
       "Your legal name when you sign an ownership transfer declaration. It's stored privately with that agreement and never shown publicly.",
-      "Photos you use in Try It On stay on your device: the mockup is made in your browser, and the photo is never uploaded or saved.",
+      "Try It On mockups are made in your browser, so your photo stays on your device. Only if you click AI-Enhanced Preview are your photo, the design's watermarked preview and your mockup sent to Cloudflare Workers AI to create the image. Ownique doesn't save them.",
       "Messages to Ask Ownique are sent to Grok (xAI) to get an answer and are not saved by Ownique.",
       "Anything recorded on Solana, like ownership and payments, is public and permanent by design.",
     ],

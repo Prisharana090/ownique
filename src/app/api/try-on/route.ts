@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isValidObjectId } from "mongoose";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
-import { hasGemini, renderTryOn } from "@/lib/gemini";
+import { hasGemini, renderTryOn, suggestPlacement } from "@/lib/gemini";
 import { logEvent } from "@/lib/events";
 
 export const maxDuration = 60;
@@ -26,15 +26,25 @@ export async function POST(req: Request) {
   const raw = d.imageData as Buffer | { buffer: Uint8Array };
   const designBytes = Buffer.isBuffer(raw) ? raw : Buffer.from(raw.buffer);
 
+  const productImg = { data: Buffer.from(await product.arrayBuffer()), mimeType: product.type };
+  const designImg = { data: designBytes, mimeType: d.imageType };
+
+  // 1) Best: a photorealistic render (needs a billing-enabled Gemini project).
   try {
-    const out = await renderTryOn(
-      { data: Buffer.from(await product.arrayBuffer()), mimeType: product.type },
-      { data: designBytes, mimeType: d.imageType }
-    );
+    const out = await renderTryOn(productImg, designImg);
     logEvent("try_on", { designId });
     return NextResponse.json({ image: `data:${out.mimeType};base64,${out.data}` });
   } catch (err) {
+    console.warn("Gemini image render unavailable, using smart placement:", (err as Error).message.slice(0, 120));
+  }
+
+  // 2) Free tier: Gemini looks at both images and places the design for you.
+  try {
+    const placement = await suggestPlacement(productImg, designImg);
+    logEvent("try_on", { designId });
+    return NextResponse.json({ placement });
+  } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Gemini couldn't make the preview this time. Try again in a moment." }, { status: 502 });
+    return NextResponse.json({ error: "Gemini is busy right now. Try again in a moment." }, { status: 502 });
   }
 }

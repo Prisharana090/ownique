@@ -16,7 +16,7 @@ Built at **HackPrinceton Fall 2026** (Business & Enterprise track).
 - Design page with a watermark preview and an ownership badge once sold
 - **Buy & Own It:** buyer pays the designer in SOL, the server verifies the payment on Solana, then moves the 1-of-1 ownership token (Metaplex Core) from the vault to the buyer
 - **Copy detector:** blocks exact copies (SHA-256) and look-alike copies (perceptual hash); borderline cases are judged by **Gemini**
-- **Try It On:** drag a design onto a photo of your own product, then **Gemini** renders a realistic printed version
+- **Try It On:** drag a design onto a photo of your own product, or let **Gemini** look at it and place the design for you (photorealistic render on a paid Gemini plan)
 - **Live dashboard:** every view, try-on, sale, upload, blocked copy and report is logged to **Tiger Data** (hypertable + per-minute continuous aggregate) and charted live
 - **Watermarked previews:** everyone sees a watermarked copy; only the owner can download the full file by signing with their wallet
 - **Certificate of Creation:** a printable proof page for every design (creator, time, file fingerprint, Solana token, owner)

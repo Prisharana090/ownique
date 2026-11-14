@@ -37,7 +37,7 @@ Designers sell their work online and lose control of it. The same design gets so
 Ownique is a design marketplace where **every design sells exactly once**.
 - **Designers** upload original work, agree to clear ownership rules, and set a price in SOL. Grok writes the description.
 - Each design becomes a **1-of-1 ownership token on Solana**, with the designer's wallet stored on-chain **forever** as the creator.
-- **Buyers** can **Try It On**: upload a photo of their own cup, glasses, or shirt, and Gemini renders a realistic preview of the design printed on it.
+- **Buyers** can **Try It On**: upload a photo of their own cup, glasses, or shirt, and Gemini looks at both images and places the design where it fits best, with a styling tip (and a photorealistic render on a paid Gemini plan).
 - When a buyer pays, the server **verifies the payment on Solana**, marks the design sold (only once, even if two people click at the same moment), and **moves the ownership token to the buyer's wallet**.
 - Only the owner can download the full-quality file, by signing a free message with their wallet. Everyone else sees a watermarked preview.
 - A **copy detector** blocks re-uploads of designs that already exist, including resized or edited copies, with Gemini judging the close calls.
@@ -60,7 +60,7 @@ Ownique is a design marketplace where **every design sells exactly once**.
 | Cursor | Core AI coding agent for the whole build (see `.cursorrules`) |
 | LangChain Deep Agents | Ask Ownique is a Deep Agent with Ownique-specific tools |
 | Grok Bot | Powers the Ask Ownique agent (incl. brand look-alike checks), writes design descriptions in-app; GitHub Action summarizes every push into `CHANGELOG.md` + Discord |
-| Gemini API | Judges whether two images are the same design; renders realistic Try It On previews |
+| Gemini API | Judges whether two images are the same design; looks at product photos to place designs in Try It On |
 | Solana | Wallet identity, verified SOL payments, 1-of-1 Metaplex Core ownership tokens with on-chain creator credit |
 | MongoDB Atlas | Users, designs, images, reports |
 | Capital One Nessie | "Pay with bank" checkout with practice bank accounts |

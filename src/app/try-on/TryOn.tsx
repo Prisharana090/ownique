@@ -16,6 +16,7 @@ export default function TryOn() {
   const [size, setSize] = useState(35); // % of photo width
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<string | null>(null);
+  const [tip, setTip] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -46,6 +47,7 @@ export default function TryOn() {
     setBusy(true);
     setError(null);
     setResult(null);
+    setTip(null);
     const form = new FormData();
     form.append("product", product);
     form.append("designId", designId);
@@ -53,7 +55,14 @@ export default function TryOn() {
       const res = await fetch("/api/try-on", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setResult(data.image);
+      if (data.image) setResult(data.image);
+      if (data.placement) {
+        // Gemini placed the design for us: move it on the live preview
+        setPos({ x: data.placement.x, y: data.placement.y });
+        setSize(Math.round(data.placement.size));
+        setRotation(Math.round(data.placement.rotation));
+        setTip(`✨ Gemini placed it on your ${data.placement.product}. ${data.placement.tip}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -97,10 +106,11 @@ export default function TryOn() {
         </label>
         <button onClick={makeRealistic} disabled={!product || !designId || busy}
           className="rounded-xl bg-violet-600 px-5 py-2.5 font-semibold text-white hover:bg-violet-700 disabled:opacity-40">
-          {busy ? "Gemini is painting… ✨" : "✨ Make it realistic"}
+          {busy ? "Gemini is looking… ✨" : "✨ Place it with Gemini"}
         </button>
       </div>
 
+      {tip && <p className="rounded-xl bg-violet-50 p-3 text-sm text-violet-800">{tip}</p>}
       {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error} You can still use the drag preview.</p>}
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -125,13 +135,13 @@ export default function TryOn() {
           </div>
         </div>
         <div>
-          <p className="mb-2 text-sm font-semibold text-stone-500">Realistic preview by Gemini</p>
+          <p className="mb-2 text-sm font-semibold text-stone-500">Realistic render by Gemini (when available)</p>
           <div className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">
             {result ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={result} alt="Realistic preview" className="h-full w-full object-contain" />
             ) : (
-              <p className="px-6 text-center text-stone-400">{busy ? "Working on it…" : "Click “Make it realistic” to see it printed for real"}</p>
+              <p className="px-6 text-center text-stone-400">{busy ? "Working on it…" : "Gemini places your design on the left. With a paid Gemini plan, a photorealistic render appears here."}</p>
             )}
           </div>
         </div>

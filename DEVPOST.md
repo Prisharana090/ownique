@@ -110,7 +110,7 @@ See the **Credits** section in our README for every library and service we used.
 
 ---
 
-# 🎤 2-minute pitch script (about 260 words)
+# 🎤 2-minute pitch script (about 270 words)
 
 **0:00 · The problem**
 "Hi, I'm [name]. Designers sell their work online, and then it gets resold, copied, or reposted without credit. And if you're a small seller buying a design for your product, you have no idea who else owns the same one."
@@ -118,28 +118,29 @@ See the **Credits** section in our README for every library and service we used.
 **0:20 · The idea**
 "Ownique is a design marketplace with one rule: every design sells once, to one owner, and the designer is credited forever."
 
-**0:30 · Designer uploads** *(show the upload page)*
-"I upload a design and agree to the ownership rules. Grok writes the description, and Solana mints a one-of-a-kind ownership token with my name on it, permanently."
+**0:30 · Designer lists it** *(upload page)*
+"I upload my design, and I sign my originality agreement with my wallet. Solana mints a one-of-a-kind ownership token with my name on it, permanently. Not sure it's original? Ask Ownique, our LangChain agent on Grok, checks it against famous brand logos first."
 
-**0:50 · Buyer tries it on** *(hold up a real cup)*
-"Julia sells cups. She snaps a photo of her cup, picks my design, and Gemini shows her exactly how it'll look printed."
+**0:55 · Buyer tries it on** *(hold up a real cup)*
+"Julia sells cups. She snaps a photo of her cup, and Gemini sees it's a mug and places my design right where it fits."
 
-**1:05 · Buyer owns it** *(click Buy)*
-"She pays in SOL. We verify the payment on Solana, and ownership moves to her wallet, live. Only she can download the full file."
+**1:10 · Buyer owns it** *(click Buy)*
+"She pays in SOL, or straight from her bank with Capital One's Nessie, no crypto needed. Ownership moves to her wallet, live, and only she can download the full file."
 
-**1:20 · The magic moment** *(re-upload the same design)*
-"Now watch what happens if I try to sell it again... blocked. Even resized or edited copies get caught."
+**1:30 · The magic moment** *(re-upload the same design)*
+"Now watch me try to sell it again... blocked. Even resized copies get caught."
 
-**1:40 · Live data** *(show the dashboard)*
-"Every view, try-on, sale, and blocked copy streams into Tiger Data, live. It's all running on Vultr, at our own domain."
+**1:40 · Proof + live data** *(Certificate, then dashboard)*
+"Every design gets a free Certificate of Creation, proof of who made it and when. And every view, sale, and blocked copy streams live into Tiger Data."
 
 **1:55 · Close**
 "Ownique: one design, one owner, credit forever. Thank you!"
 
 ### Demo checklist
-- [ ] Two wallets ready in Phantom (designer + buyer), both on **devnet** with free SOL from faucet.solana.com
-- [ ] `npm run seed` done, so the shop looks full
-- [ ] A real cup or glasses + its photo on your phone/laptop
+- [ ] Two wallets in Phantom (designer + buyer), both on **devnet** with free SOL from faucet.solana.com
+- [ ] Shop full of designs (`npm run seed`), plus "Sunrise Petals" as a sold example
+- [ ] A real cup + a photo of it on your laptop
 - [ ] The design file you'll re-upload for the "blocked" moment
-- [ ] Dashboard open in a second tab
+- [ ] Certificate + dashboard open in other tabs
+- [ ] Backup: if Wi-Fi is slow, show the already-sold "Sunrise Petals" design and its Certificate
 - [ ] Practiced 3 times, under 2 minutes

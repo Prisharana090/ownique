@@ -4,9 +4,9 @@ import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { hasVault, transferDesignToken } from "@/lib/solana";
 import { bankTransfer, ensureBankAccount, getBalance, hasNessie, solToUsd } from "@/lib/nessie";
-import { verifyWalletMessage } from "@/lib/walletAuth";
 import { logEvent } from "@/lib/events";
 import { getOwnershipGate } from "@/lib/agreements";
+import { agreementForPayment, recordAgreementPayment } from "@/lib/purchaseAgreements";
 
 /** GET → is bank checkout available, and what does this design cost in dollars? */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,9 +18,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 /**
- * POST /api/designs/:id/buy-bank { buyerWallet, message, signature, agreed }
+ * POST /api/designs/:id/buy-bank { buyerWallet, agreementId }
  * "Pay with bank" through Capital One Nessie:
- * 1. The buyer proves they own the wallet that will receive the design (free signature).
+ * 1. The buyer's wallet-signed agreement acceptance (made in the last 30 minutes) proves they own the receiving wallet.
  * 2. Money moves from the buyer's practice bank account to the designer's.
  * 3. The design is marked sold (only once) and the ownership token moves to the buyer on Solana.
  */
@@ -29,10 +29,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!hasNessie()) return NextResponse.json({ error: "Bank checkout isn't set up yet (add NESSIE_API_KEY)." }, { status: 503 });
   if (!hasDb() || !isValidObjectId(id)) return NextResponse.json({ error: "Design not found." }, { status: 404 });
 
-  const { buyerWallet, message, signature, agreed } = await req.json();
-  if (!agreed) return NextResponse.json({ error: "Please agree to all the confirmations." }, { status: 400 });
-  if (!buyerWallet || !verifyWalletMessage({ wallet: buyerWallet, message, signature, prefix: `Ownique: buy design ${id} with bank` }))
-    return NextResponse.json({ error: "Wallet signature didn't check out. Please try again." }, { status: 401 });
+  const { buyerWallet, agreementId } = await req.json();
+  if (!buyerWallet) return NextResponse.json({ error: "Connect your wallet first." }, { status: 401 });
 
   await connectDb();
   const design = await Design.findById(id);
@@ -43,6 +41,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // 📜 Not for sale until the designer has accepted the Ownership Transfer Declaration
   const gate = await getOwnershipGate(id);
   if (gate.blockReason) return NextResponse.json({ error: gate.blockReason }, { status: 403 });
+
+  // 📜 Accepted agreement (current version, signed by this wallet in the last 30 minutes) is required.
+  const acc = await agreementForPayment(id, buyerWallet, agreementId, 30 * 60 * 1000);
+  if ("error" in acc) return NextResponse.json({ error: acc.error }, { status: acc.status });
 
   // Reserve the design first so two buyers can't pay at the same moment.
   const reserved = await Design.findOneAndUpdate(
@@ -77,6 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   await Design.updateOne({ _id: id }, { nessieTransferId: transferId, priceUsd: amountUsd });
+  const paid = await recordAgreementPayment(acc.agreement.agreementId, { method: "bank", amountSol: design.price, amountUsd, reference: transferId });
   logEvent("purchase", { designId: id, wallet: buyerWallet, amountSol: design.price });
 
   let transferSignature: string | null = null;
@@ -89,5 +92,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  return NextResponse.json({ ok: true, amountUsd, transferId, buyerBalance, transferSignature });
+  return NextResponse.json({ ok: true, amountUsd, transferId, buyerBalance, transferSignature, agreementId: paid?.agreementId, transactionId: paid?.transactionId });
 }

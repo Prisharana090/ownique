@@ -85,7 +85,7 @@ export default async function DesignPage({
             <p className="font-serif text-4xl text-violet-900">{d.price} <span className="text-2xl text-fuchsia-500">SOL</span></p>
             <div id="buy" className="scroll-mt-24">
               {!gate.accepted ? (
-                <ConfirmOwnership designId={d._id} designerWallet={d.designerWallet} />
+                <ConfirmOwnership designId={d._id} designerWallet={d.designerWallet} needsReaccept={gate.needsReaccept} />
               ) : gate.blockReason ? (
                 <p className="rounded-3xl border border-fuchsia-200 bg-fuchsia-50 p-5 text-sm text-fuchsia-900">⚖️ {gate.blockReason}</p>
               ) : checkout === "1" ? (

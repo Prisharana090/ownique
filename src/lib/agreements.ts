@@ -4,7 +4,7 @@ import { User } from "@/models/User";
 import { Design } from "@/models/Design";
 import { DesignerAgreement } from "@/models/DesignerAgreement";
 import {
-  CONFIRMATION_REQUIRED, DECLARATION_TEXT, DECLARATION_VERSION, RIGHTS_REVIEW_REQUIRED,
+  CONFIRMATION_REQUIRED, DECLARATION_TEXT, DECLARATION_VERSION, REACCEPT_REQUIRED, RIGHTS_REVIEW_REQUIRED,
   cleanLegalName, declarationPrefix, isValidLegalName,
 } from "@/lib/declaration";
 import { verifyWalletMessage } from "@/lib/walletAuth";
@@ -51,7 +51,16 @@ export function checkDeclaration(d: DeclarationInput): string | null {
 }
 
 /** Saves the acceptance (designer user id, legal name, design id, version, timestamp, status). */
+// Older databases had one-agreement-per-design; amendments need one per version, so sync the indexes once.
+let indexesSynced: Promise<unknown> | null = null;
+
 export async function recordDeclaration(designId: string, d: DeclarationInput) {
+  indexesSynced ??= (async () => {
+    const idx = await DesignerAgreement.collection.indexes();
+    if (idx.some((i) => i.name === "designId_1" && i.unique)) await DesignerAgreement.collection.dropIndex("designId_1");
+    await DesignerAgreement.createIndexes();
+  })().catch((e) => { indexesSynced = null; throw e; });
+  await indexesSynced;
   const user = await User.findOneAndUpdate(
     { walletAddress: d.designerWallet },
     { $setOnInsert: { walletAddress: d.designerWallet } },
@@ -74,6 +83,7 @@ export async function recordDeclaration(designId: string, d: DeclarationInput) {
     thirdPartyContent: d.thirdPartyContent,
     thirdPartyDetails: d.thirdPartyDetails,
     rightsReview,
+    history: [{ at: new Date(), event: `Designer accepted agreement version ${DECLARATION_VERSION}` }],
   });
   await Design.updateOne({ _id: designId }, { ownershipConfirmed: true, rightsReview });
   return agreement;
@@ -85,14 +95,23 @@ export type OwnershipGate = {
   agreementVersion: string | null;
   rightsReview: "not_needed" | "pending" | "cleared" | "rejected";
   blockReason: string | null; // why it can't be purchased right now (null = OK to buy)
+  needsReaccept: boolean; // accepted an older version; the agreement was amended
+  designerAgreementId: string | null;
 };
 
 /** The single source of truth for "can this design be bought?" */
 export async function getOwnershipGate(designId: string): Promise<OwnershipGate> {
-  const a = await DesignerAgreement.findOne({ designId, status: "accepted" })
-    .select("acceptedAt agreementVersion rightsReview")
-    .lean<{ acceptedAt: Date; agreementVersion: string; rightsReview: OwnershipGate["rightsReview"] }>();
-  if (!a) return { accepted: false, acceptedAt: null, agreementVersion: null, rightsReview: "not_needed", blockReason: CONFIRMATION_REQUIRED };
+  // Only an acceptance of the CURRENT agreement version counts (amendments require fresh acceptance).
+  const a = await DesignerAgreement.findOne({ designId, status: "accepted", agreementVersion: DECLARATION_VERSION })
+    .select("_id acceptedAt agreementVersion rightsReview")
+    .lean<{ _id: unknown; acceptedAt: Date; agreementVersion: string; rightsReview: OwnershipGate["rightsReview"] }>();
+  if (!a) {
+    const old = await DesignerAgreement.exists({ designId, status: "accepted" });
+    return {
+      accepted: false, acceptedAt: null, agreementVersion: null, rightsReview: "not_needed",
+      blockReason: old ? REACCEPT_REQUIRED : CONFIRMATION_REQUIRED, needsReaccept: Boolean(old), designerAgreementId: null,
+    };
+  }
   const blocked = a.rightsReview === "pending" || a.rightsReview === "rejected";
   return {
     accepted: true,
@@ -100,5 +119,7 @@ export async function getOwnershipGate(designId: string): Promise<OwnershipGate>
     agreementVersion: a.agreementVersion,
     rightsReview: a.rightsReview,
     blockReason: blocked ? RIGHTS_REVIEW_REQUIRED : null,
+    needsReaccept: false,
+    designerAgreementId: String(a._id),
   };
 }

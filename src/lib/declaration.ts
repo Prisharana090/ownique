@@ -1,6 +1,8 @@
 // 📜 Designer Ownership Transfer Declaration (shared by the browser and the server).
 // Bump the version whenever the wording changes; every acceptance stores the version it agreed to.
-export const DECLARATION_VERSION = "2026-11-14.v1";
+// Same version as the Exclusive Design Purchase Agreement: designer and buyer must accept the same version.
+import { AGREEMENT_VERSION } from "./purchaseTerms";
+export const DECLARATION_VERSION = AGREEMENT_VERSION;
 
 export const DECLARATION_TEXT =
   "I confirm that I am the original creator of this design or have the necessary legal authority to transfer its rights. " +
@@ -9,6 +11,8 @@ export const DECLARATION_TEXT =
   "buyer and will not commercially resell, redistribute, or reuse the transferred design.";
 
 export const CONFIRMATION_REQUIRED = "Designer ownership confirmation required.";
+export const REACCEPT_REQUIRED =
+  "The agreement was updated. The designer must review and accept the new version before this design can be sold.";
 export const RIGHTS_REVIEW_REQUIRED =
   "This design includes third-party content that needs a separate rights review before it can be sold.";
 

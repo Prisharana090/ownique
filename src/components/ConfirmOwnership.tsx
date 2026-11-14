@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
 import DeclarationFields, { declarationComplete, emptyDeclaration, signDeclaration, type DeclarationState } from "./DeclarationFields";
-import { CONFIRMATION_REQUIRED, declarationPrefix } from "@/lib/declaration";
+import { CONFIRMATION_REQUIRED, DECLARATION_VERSION, REACCEPT_REQUIRED, declarationPrefix } from "@/lib/declaration";
 
-export default function ConfirmOwnership({ designId, designerWallet }: { designId: string; designerWallet: string }) {
+export default function ConfirmOwnership({ designId, designerWallet, needsReaccept = false }: { designId: string; designerWallet: string; needsReaccept?: boolean }) {
   const router = useRouter();
   const { publicKey, signMessage } = useWallet();
   const [open, setOpen] = useState(false);
@@ -38,13 +38,13 @@ export default function ConfirmOwnership({ designId, designerWallet }: { designI
 
   return (
     <div className="space-y-3 rounded-3xl border border-fuchsia-200 bg-fuchsia-50 p-5">
-      <p className="font-semibold text-fuchsia-900">🔒 {CONFIRMATION_REQUIRED}</p>
+      <p className="font-semibold text-fuchsia-900">🔒 {needsReaccept ? REACCEPT_REQUIRED : CONFIRMATION_REQUIRED}</p>
       <p className="text-sm text-fuchsia-900/80">
         This design can&apos;t be bought until its original designer accepts the ownership transfer declaration.
       </p>
       {isDesigner && !open && (
         <button onClick={() => setOpen(true)} className="rounded-full bg-violet-700 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-800">
-          I&apos;m the designer: confirm ownership
+          {needsReaccept ? `I'm the designer: accept version ${DECLARATION_VERSION}` : "I'm the designer: confirm ownership"}
         </button>
       )}
       {isDesigner && open && (

@@ -5,9 +5,12 @@ import { Design } from "@/models/Design";
 import { hasVault, transferDesignToken, verifyPayment } from "@/lib/solana";
 import { logEvent } from "@/lib/events";
 import { getOwnershipGate } from "@/lib/agreements";
+import { agreementForPayment, recordAgreementPayment } from "@/lib/purchaseAgreements";
+import { PurchaseAgreement } from "@/models/PurchaseAgreement";
 
 /**
- * POST /api/designs/:id/buy  { buyerWallet, signature, agreed }
+ * POST /api/designs/:id/buy  { buyerWallet, signature, agreementId }
+ * 0. Requires the buyer's accepted Exclusive Design Purchase Agreement (checked on the server).
  * 1. Verifies on Solana that the buyer really paid the designer the full price.
  * 2. Marks the design as sold (only once — a second buyer is rejected).
  * 3. Moves the ownership token from the vault to the buyer.
@@ -16,8 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   if (!hasDb() || !isValidObjectId(id)) return NextResponse.json({ error: "Design not found." }, { status: 404 });
 
-  const { buyerWallet, signature, agreed } = await req.json();
-  if (!agreed) return NextResponse.json({ error: "Please agree to all the confirmations." }, { status: 400 });
+  const { buyerWallet, signature, agreementId } = await req.json();
   if (!buyerWallet || !signature) return NextResponse.json({ error: "Missing wallet or payment." }, { status: 400 });
 
   await connectDb();
@@ -31,8 +33,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const gate = await getOwnershipGate(id);
   if (gate.blockReason) return NextResponse.json({ error: gate.blockReason }, { status: 403 });
 
+  // 📜 The buyer must have accepted the current agreement version (same version as the designer).
+  const acc = await agreementForPayment(id, buyerWallet, agreementId);
+  if ("error" in acc) return NextResponse.json({ error: acc.error }, { status: acc.status });
+
   // Each payment can only be used once.
-  if (await Design.exists({ txSignature: signature }))
+  if ((await Design.exists({ txSignature: signature })) || (await PurchaseAgreement.exists({ "payment.reference": signature })))
     return NextResponse.json({ error: "This payment was already used." }, { status: 409 });
 
   const check = await verifyPayment({
@@ -51,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   );
   if (!sold) return NextResponse.json({ error: "Sorry, someone else just bought it." }, { status: 409 });
 
+  const paid = await recordAgreementPayment(acc.agreement.agreementId, { method: "sol", amountSol: sold.price, amountUsd: null, reference: signature });
   logEvent("purchase", { designId: id, wallet: buyerWallet, amountSol: sold.price });
 
   // Hand over the ownership token.
@@ -64,5 +71,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  return NextResponse.json({ ok: true, transferSignature, mintAddress: sold.mintAddress });
+  return NextResponse.json({ ok: true, transferSignature, mintAddress: sold.mintAddress, agreementId: paid?.agreementId, transactionId: paid?.transactionId });
 }

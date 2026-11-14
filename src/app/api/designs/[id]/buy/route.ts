@@ -3,6 +3,7 @@ import { isValidObjectId } from "mongoose";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { hasVault, transferDesignToken, verifyPayment } from "@/lib/solana";
+import { logEvent } from "@/lib/events";
 
 /**
  * POST /api/designs/:id/buy  { buyerWallet, signature, agreed }
@@ -44,6 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     { new: true }
   );
   if (!sold) return NextResponse.json({ error: "Sorry, someone else just bought it." }, { status: 409 });
+
+  logEvent("purchase", { designId: id, wallet: buyerWallet, amountSol: sold.price });
 
   // Hand over the ownership token.
   let transferSignature: string | null = null;

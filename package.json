@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed": "node --env-file=.env.local scripts/seed.mjs"
   },
   "dependencies": {
     "@metaplex-foundation/mpl-core": "^1.10.0",
@@ -24,7 +25,8 @@
     "react-dom": "19.1.0",
     "recharts": "^3.10.1",
     "server-only": "^0.0.1",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

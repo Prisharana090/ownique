@@ -4,6 +4,13 @@ import { connectDb, hasDb } from "@/lib/db";
 import { Design, CATEGORIES } from "@/models/Design";
 import { describeWithGrok } from "@/lib/grok";
 import { hasVault, mintDesignToken } from "@/lib/solana";
+import { dHash, hammingDistance } from "@/lib/imageHash";
+import { hasGemini, isSameDesign } from "@/lib/gemini";
+import { logEvent } from "@/lib/events";
+
+const BLOCK_MESSAGE = "🚫 This design looks like one that's already owned. Sold designs can't be listed again.";
+const LOOKS_IDENTICAL = 6; // bits different out of 64 → definitely a copy
+const MAYBE_COPY = 14; // in between → ask Gemini to decide
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
@@ -40,15 +47,48 @@ export async function POST(req: Request) {
   await connectDb();
   const bytes = Buffer.from(await file.arrayBuffer());
 
-  // 🚫 Starter copy check: blocks exact duplicates.
-  // TODO (Prompt 9): upgrade to perceptual hash + Gemini so edited copies are caught too.
+  // 🚫 Copy detector, step 1: exact same file.
   const imageHash = createHash("sha256").update(bytes).digest("hex");
-  const existing = await Design.findOne({ imageHash }).lean();
-  if (existing)
-    return NextResponse.json(
-      { error: "🚫 This design looks like one that's already owned. Sold designs can't be listed again." },
-      { status: 409 }
-    );
+  if (await Design.exists({ imageHash })) {
+    logEvent("blocked_upload", { wallet: designerWallet });
+    return NextResponse.json({ error: BLOCK_MESSAGE }, { status: 409 });
+  }
+
+  // 🚫 Step 2: looks the same (resized, recompressed, slightly edited).
+  let hash: string | null = null;
+  try {
+    hash = await dHash(bytes);
+  } catch {
+    return NextResponse.json({ error: "We couldn't read that image. Try a PNG or JPG." }, { status: 400 });
+  }
+  const others = await Design.find({ dHash: { $ne: null } }).select("dHash").lean<{ _id: unknown; dHash: string }[]>();
+  let closest: { id: unknown; distance: number } | null = null;
+  for (const o of others) {
+    const distance = hammingDistance(hash, o.dHash);
+    if (!closest || distance < closest.distance) closest = { id: o._id, distance };
+  }
+  if (closest && closest.distance <= LOOKS_IDENTICAL) {
+    logEvent("blocked_upload", { wallet: designerWallet });
+    return NextResponse.json({ error: BLOCK_MESSAGE }, { status: 409 });
+  }
+
+  // 🤖 Step 3: borderline? Gemini compares the two images and decides.
+  if (closest && closest.distance <= MAYBE_COPY && hasGemini()) {
+    try {
+      const other = await Design.findById(closest.id).select("+imageData imageType").lean<{ imageData: unknown; imageType: string }>();
+      if (other) {
+        const raw = other.imageData as Buffer | { buffer: Uint8Array };
+        const otherBytes = Buffer.isBuffer(raw) ? raw : Buffer.from(raw.buffer);
+        const verdict = await isSameDesign({ data: bytes, mimeType: file.type }, { data: otherBytes, mimeType: other.imageType });
+        if (verdict.same) {
+          logEvent("blocked_upload", { wallet: designerWallet });
+          return NextResponse.json({ error: `${BLOCK_MESSAGE} (Gemini: ${verdict.reason})` }, { status: 409 });
+        }
+      }
+    } catch (err) {
+      console.error("Gemini copy check failed, allowing upload:", err);
+    }
+  }
 
   const grok = await describeWithGrok(title, category);
 
@@ -59,6 +99,7 @@ export async function POST(req: Request) {
     imageData: bytes,
     imageType: file.type,
     imageHash,
+    dHash: hash,
     designerWallet,
     description: grok.description,
     tags: grok.tags,
@@ -82,5 +123,6 @@ export async function POST(req: Request) {
     }
   }
 
+  logEvent("upload", { designId: String(design._id), wallet: designerWallet });
   return NextResponse.json({ ok: true, id: String(design._id), mintAddress: design.mintAddress });
 }

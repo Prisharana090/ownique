@@ -4,6 +4,10 @@ import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { short } from "@/lib/short";
 import BuyButton from "@/components/BuyButton";
+import ReportButton from "@/components/ReportButton";
+import OwnerDownload from "@/components/OwnerDownload";
+import Link from "next/link";
+import { logEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -21,24 +25,26 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
   if (!doc) notFound();
   const d: D = JSON.parse(JSON.stringify(doc));
   const sold = d.status === "sold";
+  if (d.status === "hidden") notFound();
+  logEvent("view", { designId: d._id });
 
   return (
     <div className="grid gap-10 md:grid-cols-2">
       <div className="relative overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/api/designs/${d._id}/image`} alt={d.title} className="w-full object-cover" />
-        {!sold && (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-3xl font-bold text-white/40 [text-shadow:0_1px_4px_rgba(0,0,0,.3)] -rotate-12">
-            Ownique • Preview
-          </span>
-        )}
       </div>
 
       <div className="space-y-6">
         <div>
           <p className="text-sm font-medium capitalize text-violet-700">For {d.category}</p>
           <h1 className="text-4xl font-bold">{d.title}</h1>
-          <p className="mt-1 text-stone-500">Designed by {short(d.designerWallet)}</p>
+          <p className="mt-1 text-stone-500">
+            Designed by{" "}
+            <Link href={`/profile/${d.designerWallet}`} className="font-medium text-violet-700 hover:underline">
+              {short(d.designerWallet)}
+            </Link>
+          </p>
         </div>
 
         <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -52,6 +58,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
         </div>
 
         {sold ? (
+          <div className="space-y-3">
           <div className="rounded-2xl bg-stone-900 p-5 text-sm text-white">
             <b>Owned by</b> {short(d.ownerWallet)} · <b>Designed by</b> {short(d.designerWallet)}
             {d.soldAt && <> · <b>Sold</b> {new Date(d.soldAt).toLocaleDateString()}</>}
@@ -59,14 +66,16 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
               <> · <a className="underline" target="_blank" href={`https://explorer.solana.com/tx/${d.txSignature}?cluster=devnet`}>View on Solana</a></>
             )}
           </div>
+          {d.ownerWallet && <OwnerDownload designId={d._id} ownerWallet={d.ownerWallet} />}
+          </div>
         ) : (
           <div className="space-y-3">
             <p className="text-3xl font-bold">{d.price} SOL</p>
             <BuyButton designId={d._id} title={d.title} price={d.price} designerWallet={d.designerWallet} />
-            {/* TODO (Prompt 10): Try It On with Gemini */}
-            <button disabled className="w-full rounded-xl border border-stone-300 py-3 font-semibold opacity-60">
-              ☕ Try It On (coming next)
-            </button>
+            <a href={`/try-on?design=${d._id}`}
+              className="block w-full rounded-xl border border-stone-300 py-3 text-center font-semibold hover:bg-stone-50">
+              ☕ Try It On
+            </a>
           </div>
         )}
         {d.mintAddress && (
@@ -75,7 +84,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
             ⛓️ Ownership token on Solana: {short(d.mintAddress)}
           </a>
         )}
-        {/* TODO (Prompt 12): Report button */}
+        <ReportButton designId={d._id} />
       </div>
     </div>
   );

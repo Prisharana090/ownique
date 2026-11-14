@@ -10,7 +10,8 @@ const DesignSchema = new Schema(
     // Image is stored in MongoDB for hackathon simplicity (max ~2MB).
     imageData: { type: Buffer, required: true, select: false },
     imageType: { type: String, required: true },
-    imageHash: { type: String, required: true, index: true }, // SHA-256 for duplicate blocking
+    imageHash: { type: String, required: true, index: true }, // SHA-256: exact copies
+    dHash: { type: String, default: null }, // perceptual hash: look-alike copies
     designerWallet: { type: String, required: true, index: true },
     ownerWallet: { type: String, default: null },
     status: { type: String, enum: ["listed", "sold", "hidden"], default: "listed" },

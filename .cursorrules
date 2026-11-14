@@ -11,8 +11,10 @@ Stack: Next.js 15 (App Router, TypeScript, src/ folder), Tailwind v4, mongoose,
 Already built (starter): wallet login, upload with confirmation checkboxes, Grok descriptions,
 shop, design page, policy page, exact-duplicate blocking (SHA-256),
 Solana ownership token (Metaplex Core, minted to a vault) + Buy & Own It flow with on-chain payment check.
-Next to build: Gemini copy detector + Try It On,
-Tiger Data dashboard, reports/admin, Vultr deploy.
+Also built: Gemini copy detector (dHash + Gemini) + Try It On, Tiger Data live dashboard,
+report button, Grok Bot GitHub Action, Dockerfile + DEPLOY.md,
+watermarked previews + owner-only download (wallet signature), profile pages, seed script, DEVPOST.md.
+Next: deploy to Vultr + GoDaddy domain, seed demo data, polish.
 
 Rules: build small working pieces, keep code simple and commented,
 secrets only in .env.local, friendly error messages, clean rounded UI.

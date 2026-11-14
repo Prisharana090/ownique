@@ -8,6 +8,8 @@ const ownership: Section[] = [
     title: "🎨 For designers",
     items: [
       "You upload original work and set your price.",
+      "Before a design can be sold, you sign an ownership transfer declaration with your full legal name and your wallet, confirming you created it (or have the authority to transfer its rights).",
+      "If your design includes third-party content (stock images, licensed fonts, someone else's artwork), it needs a separate rights review before it can be sold.",
       "When it sells, ownership moves to the buyer, permanently.",
       "You keep your name on it forever as the creator.",
       "After it sells, you can't sell or reuse it again. Showing it in your portfolio needs the buyer's separate permission.",
@@ -67,6 +69,7 @@ const copyright: Section[] = [
       "If the report is right, the design is removed. If it's wrong, the design is restored.",
       "Designers who repeatedly upload other people's work lose their account.",
       "Because the designer's wallet is recorded on Solana when a design is listed, there's always a permanent record of who listed what, and when.",
+      "A signed declaration records the designer's promise; it doesn't by itself prove authorship or ownership, so reports are still reviewed on the evidence.",
     ],
   },
 ];
@@ -80,6 +83,7 @@ const privacy: Section[] = [
       "The designs you upload, with their title, price and the time you agreed to these terms.",
       "Activity like views, try-ons and sales, used only to power the live dashboard.",
       "Reports you send, so we can review them.",
+      "Your legal name when you sign an ownership transfer declaration. It's stored privately with that agreement and never shown publicly.",
       "Photos you upload to Try It On are used to make your preview and are not saved.",
       "Messages to Ask Ownique are sent to Grok (xAI) to get an answer and are not saved by Ownique.",
       "Anything recorded on Solana, like ownership and payments, is public and permanent by design.",

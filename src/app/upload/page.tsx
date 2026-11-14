@@ -3,14 +3,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
+import DeclarationFields, { declarationComplete, emptyDeclaration, signDeclaration, type DeclarationState } from "@/components/DeclarationFields";
+import { declarationPrefix } from "@/lib/declaration";
 
 const CATEGORIES = ["cup", "glasses", "shirt", "phone case", "tote", "other"];
 
 const CONFIRMATIONS = [
-  "I created this design myself. It isn't copied, and it doesn't use any brand logo, trademark or character.",
-  "Once someone buys it, they own it completely.",
-  "After it sells, I won't sell, reuse, or re-upload it anywhere.",
-  "I'll always be credited as the original designer.",
+  "It doesn't use any brand logo, trademark, mascot or character.",
+  "I understand I'll be credited as the creator, but the buyer will own the design.",
   "I agree to the Ownership Policy.",
 ];
 
@@ -23,11 +23,12 @@ export default function Upload() {
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("cup");
   const [checked, setChecked] = useState<boolean[]>(CONFIRMATIONS.map(() => false));
+  const [declaration, setDeclaration] = useState<DeclarationState>(emptyDeclaration);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const allChecked = checked.every(Boolean);
-  const ready = Boolean(publicKey && file && title && Number(price) > 0 && allChecked);
+  const ready = Boolean(publicKey && file && title && Number(price) > 0 && allChecked && declarationComplete(declaration));
 
   function pickFile(f: File | null) {
     setFile(f);
@@ -40,11 +41,10 @@ export default function Upload() {
     if (!signMessage) return setError("Your wallet can't sign messages. Try Phantom.");
     setBusy(true);
     setError(null);
-    // ✍️ Sign the agreement with the wallet (free, no transaction)
-    let message: string, signature: string;
+    // ✍️ Sign the ownership declaration with the wallet (free, no transaction)
+    let signed: Record<string, string>;
     try {
-      message = `Ownique: I created this design, I agree to the terms, and I list it for sale at ${Date.now()}`;
-      signature = bs58.encode(await signMessage(new TextEncoder().encode(message)));
+      signed = await signDeclaration(declaration, signMessage, bs58.encode, (n) => declarationPrefix(n));
     } catch {
       setError("You need to approve the signature in your wallet to list the design.");
       setBusy(false);
@@ -57,8 +57,7 @@ export default function Upload() {
     form.append("category", category);
     form.append("designerWallet", publicKey.toBase58());
     form.append("agreed", String(allChecked));
-    form.append("message", message);
-    form.append("signature", signature);
+    for (const [k, v] of Object.entries(signed)) form.append(k, v);
     try {
       const res = await fetch("/api/designs", { method: "POST", body: form });
       const data = await res.json();
@@ -108,17 +107,19 @@ export default function Upload() {
         </div>
 
         <fieldset className="space-y-2 rounded-xl bg-stone-50 p-4">
-          <legend className="mb-1 text-sm font-semibold">Before you list your design</legend>
+          <legend className="mb-1 text-sm font-semibold">Listing rules</legend>
           {CONFIRMATIONS.map((text, i) => (
             <label key={i} className="flex gap-2 text-sm">
               <input type="checkbox" className="mt-0.5 accent-violet-600" checked={checked[i]}
                 onChange={(e) => setChecked((c) => c.map((v, j) => (j === i ? e.target.checked : v)))} />
               <span>
-                {i === 4 ? <>I agree to the <a href="/policy" target="_blank" className="underline">Ownership, Copyright &amp; Privacy terms</a>.</> : text}
+                {i === CONFIRMATIONS.length - 1 ? <>I agree to the <a href="/policy" target="_blank" className="underline">Ownership, Copyright &amp; Privacy terms</a>.</> : text}
               </span>
             </label>
           ))}
         </fieldset>
+
+        <DeclarationFields value={declaration} onChange={setDeclaration} disabled={busy} />
 
         <p className="text-xs text-stone-500">
           Not sure your design is original? Attach it to <b>💬 Ask Ownique</b> (bottom right) for a quick brand look-alike check.
@@ -128,7 +129,7 @@ export default function Upload() {
 
         <button disabled={!ready || busy}
           className="w-full rounded-full bg-violet-700 py-3 font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-40">
-          {busy ? "Listing… (sign in your wallet, then Grok writes your description ✨)" : "Sign & List My Design"}
+          {busy ? "Listing… (sign in your wallet, then Grok writes your description ✨)" : "Sign Declaration & List Design"}
         </button>
       </div>
     </form>

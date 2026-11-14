@@ -4,6 +4,7 @@ import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { hasVault, transferDesignToken, verifyPayment } from "@/lib/solana";
 import { logEvent } from "@/lib/events";
+import { getOwnershipGate } from "@/lib/agreements";
 
 /**
  * POST /api/designs/:id/buy  { buyerWallet, signature, agreed }
@@ -25,6 +26,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (design.status === "sold") return NextResponse.json({ error: "Sorry, this design already has an owner." }, { status: 409 });
   if (design.designerWallet === buyerWallet)
     return NextResponse.json({ error: "You can't buy your own design." }, { status: 400 });
+
+  // 📜 Not for sale until the designer has accepted the Ownership Transfer Declaration
+  const gate = await getOwnershipGate(id);
+  if (gate.blockReason) return NextResponse.json({ error: gate.blockReason }, { status: 403 });
 
   // Each payment can only be used once.
   if (await Design.exists({ txSignature: signature }))

@@ -25,6 +25,9 @@ const DesignSchema = new Schema(
     priceUsd: { type: Number, default: null },
     tokenTransferSignature: { type: String, default: null },
     soldAt: { type: Date, default: null },
+    // Designer Ownership Transfer Declaration (details live in DesignerAgreement)
+    ownershipConfirmed: { type: Boolean, default: false },
+    rightsReview: { type: String, enum: ["not_needed", "pending", "cleared", "rejected"], default: "not_needed" },
     agreedAt: { type: Date, required: true }, // when the designer ticked all checkboxes
   },
   { timestamps: true }

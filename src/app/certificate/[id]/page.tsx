@@ -4,6 +4,7 @@ import { isValidObjectId } from "mongoose";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import PrintButton from "@/components/PrintButton";
+import { getOwnershipGate } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function Certificate({ params }: { params: Promise<{ id: st
   if (!doc) notFound();
   const d: D = JSON.parse(JSON.stringify(doc));
   if (d.status === "hidden") notFound();
+  const gate = await getOwnershipGate(d._id);
   const explorer = (kind: "address" | "tx", v: string) => `https://explorer.solana.com/${kind}/${v}?cluster=devnet`;
 
   const rows: [string, React.ReactNode][] = [
@@ -32,7 +34,12 @@ export default async function Certificate({ params }: { params: Promise<{ id: st
     ["Made for", <span key="c" className="capitalize">{d.category}</span>],
     ["Created by (wallet)", <code key="dw" className="break-all">{d.designerWallet}</code>],
     ["Created on", fmt(d.createdAt)],
-    ["Originality agreed on", fmt(d.agreedAt)],
+    [
+      "Ownership transfer declaration",
+      gate.accepted
+        ? `Accepted, version ${gate.agreementVersion}, ${fmt(gate.acceptedAt?.toISOString())}${gate.rightsReview === "pending" ? " · third-party rights under review" : ""}`
+        : "Not yet accepted",
+    ],
     ["Digital fingerprint (SHA-256)", <code key="h" className="break-all text-xs">{d.imageHash}</code>],
     [
       "Ownership token (Solana)",
@@ -83,7 +90,8 @@ export default async function Certificate({ params }: { params: Promise<{ id: st
         <p className="mt-8 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-500">
           This certificate records what Ownique saw when the design was listed: the creator&apos;s wallet, the exact time,
           and a fingerprint of the original file. The ownership token on Solana (devnet) is public and permanent, so anyone
-          can check it. Copyright belongs to the creator automatically by law; this certificate is evidence of creation and
+          can check it. The designer&apos;s signed declaration records their promise; it does not by itself prove authorship or ownership.
+          Copyright belongs to the creator automatically by law; this certificate is evidence of creation and
           transfer, not an official copyright registration or legal advice.
         </p>
       </div>

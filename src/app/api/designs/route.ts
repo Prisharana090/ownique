@@ -7,7 +7,7 @@ import { hasVault, mintDesignToken } from "@/lib/solana";
 import { dHash, hammingDistance } from "@/lib/imageHash";
 import { hasGemini, isSameDesign } from "@/lib/gemini";
 import { logEvent } from "@/lib/events";
-import { verifyWalletMessage } from "@/lib/walletAuth";
+import { checkDeclaration, readDeclaration, recordDeclaration } from "@/lib/agreements";
 
 const BLOCK_MESSAGE = "🚫 This design looks like one that's already owned. Sold designs can't be listed again.";
 const LOOKS_IDENTICAL = 6; // bits different out of 64 → definitely a copy
@@ -34,8 +34,7 @@ export async function POST(req: Request) {
   const category = String(form.get("category") ?? "other");
   const designerWallet = String(form.get("designerWallet") ?? "");
   const agreed = form.get("agreed") === "true";
-  const message = String(form.get("message") ?? "");
-  const signature = String(form.get("signature") ?? "");
+  const declaration = readDeclaration(form, designerWallet);
 
   if (!(file instanceof File)) return NextResponse.json({ error: "Please choose an image." }, { status: 400 });
   if (!file.type.startsWith("image/")) return NextResponse.json({ error: "File must be an image." }, { status: 400 });
@@ -46,9 +45,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unknown category." }, { status: 400 });
   if (!designerWallet) return NextResponse.json({ error: "Connect your wallet first." }, { status: 401 });
   if (!agreed) return NextResponse.json({ error: "Please agree to all the confirmations." }, { status: 400 });
-  // ✍️ The designer signs their agreement with their wallet, so nobody can list designs in someone else's name.
-  if (!verifyWalletMessage({ wallet: designerWallet, message, signature, prefix: "Ownique: I created this design, I agree to the terms, and I list it for sale" }))
-    return NextResponse.json({ error: "Please sign the agreement with your wallet to list this design." }, { status: 401 });
+  // ✍️ Designer Ownership Transfer Declaration: legal name + review + accept + authority, signed with the wallet
+  // (so nobody can list designs in someone else's name, and the acceptance is tied to this exact wording).
+  const declarationError = checkDeclaration(declaration);
+  if (declarationError) return NextResponse.json({ error: declarationError }, { status: 400 });
 
   await connectDb();
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -112,6 +112,15 @@ export async function POST(req: Request) {
     describedByGrok: grok.byGrok,
     agreedAt: new Date(),
   });
+
+  // 📜 Save the declaration (designer user id, legal name, design id, version, timestamp, status)
+  try {
+    await recordDeclaration(String(design._id), declaration);
+  } catch (err) {
+    await Design.deleteOne({ _id: design._id });
+    console.error("Saving the declaration failed:", err);
+    return NextResponse.json({ error: "We couldn't save your ownership declaration. Please try again." }, { status: 500 });
+  }
 
   // ⛓️ Mint the 1-of-1 ownership token on Solana (held by the vault until someone buys it).
   // If Solana isn't set up yet, the design still lists so you can keep building.

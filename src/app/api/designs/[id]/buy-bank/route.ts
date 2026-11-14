@@ -6,6 +6,7 @@ import { hasVault, transferDesignToken } from "@/lib/solana";
 import { bankTransfer, ensureBankAccount, getBalance, hasNessie, solToUsd } from "@/lib/nessie";
 import { verifyWalletMessage } from "@/lib/walletAuth";
 import { logEvent } from "@/lib/events";
+import { getOwnershipGate } from "@/lib/agreements";
 
 /** GET → is bank checkout available, and what does this design cost in dollars? */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -38,6 +39,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!design || design.status === "hidden") return NextResponse.json({ error: "Design not found." }, { status: 404 });
   if (design.status === "sold") return NextResponse.json({ error: "Sorry, this design already has an owner." }, { status: 409 });
   if (design.designerWallet === buyerWallet) return NextResponse.json({ error: "You can't buy your own design." }, { status: 400 });
+
+  // 📜 Not for sale until the designer has accepted the Ownership Transfer Declaration
+  const gate = await getOwnershipGate(id);
+  if (gate.blockReason) return NextResponse.json({ error: gate.blockReason }, { status: 403 });
 
   // Reserve the design first so two buyers can't pay at the same moment.
   const reserved = await Design.findOneAndUpdate(

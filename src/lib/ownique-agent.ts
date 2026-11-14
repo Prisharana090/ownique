@@ -97,7 +97,7 @@ const TERMS: Record<string, string> = {
   payment:
     "The ownership token waits in a secure Ownique vault. The buyer pays the designer directly in SOL; Ownique verifies the payment on Solana and only then moves the token to the buyer. Each payment can be used once.",
   copyright:
-    "Only upload work you created or have written permission to sell. No copying, tracing or lightly editing others' art. No fan art of characters from movies, shows, games or cartoons. A buyer receives the rights the designer had.",
+    "Before a design can be sold, the designer must sign an Ownership Transfer Declaration (legal name + wallet signature) confirming they created it or have authority to transfer its rights; without it, the design shows 'Designer ownership confirmation required' and can't be bought. Designs with third-party content need a separate rights review first. A declaration records a promise; it does not by itself prove authorship or ownership. Only upload work you created or have written permission to sell. No copying, tracing or lightly editing others' art. No fan art of characters from movies, shows, games or cartoons. A buyer receives the rights the designer had.",
   trademarks:
     "No brand logos, names, mascots or sports team logos, or anything confusingly similar. Changing colors or a few letters of a famous logo is still not allowed. Ask Ownique is a first check, not a legal trademark search.",
   reporting:

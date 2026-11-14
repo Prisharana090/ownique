@@ -9,6 +9,8 @@ export type DesignSummary = {
   status: string;
   designerWallet: string;
   ownerWallet?: string | null;
+  ownershipConfirmed?: boolean;
+  rightsReview?: string;
 };
 
 export default function DesignCard({ d }: { d: DesignSummary }) {
@@ -24,6 +26,11 @@ export default function DesignCard({ d }: { d: DesignSummary }) {
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-medium capitalize text-violet-800 backdrop-blur">
           {d.category}
         </span>
+        {!sold && (!d.ownershipConfirmed || d.rightsReview === "pending") && (
+          <span className="absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-fuchsia-700 backdrop-blur">
+            {d.ownershipConfirmed ? "⚖️ Rights review" : "🔒 Awaiting designer confirmation"}
+          </span>
+        )}
         {sold && (
           <span className="absolute right-3 top-3 rounded-full bg-violet-900 px-3 py-1 text-xs font-semibold text-fuchsia-200">
             👑 Owned

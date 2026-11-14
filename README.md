@@ -14,6 +14,7 @@ Built at **HackPrinceton Fall 2026** (Business & Enterprise track).
 - Grok (xAI) writes each design's description and tags
 - Shop page with category filters
 - Design page with a watermark preview and an ownership badge once sold
+- **Designer Ownership Transfer Declaration:** legal name + versioned declaration + authority confirmation, signed with the wallet and saved per design; purchases are blocked until it's accepted, and third-party content is flagged for rights review
 - **Exclusive Ownership Terms preview:** before checkout, buyers see exactly which rights they get for that design
 - **Buy & Own It:** buyer pays the designer in SOL, the server verifies the payment on Solana, then moves the 1-of-1 ownership token (Metaplex Core) from the vault to the buyer
 - **Copy detector:** blocks exact copies (SHA-256) and look-alike copies (perceptual hash); borderline cases are judged by **Gemini**

@@ -7,6 +7,8 @@ import BuyButton from "@/components/BuyButton";
 import ReportButton from "@/components/ReportButton";
 import OwnerDownload from "@/components/OwnerDownload";
 import Link from "next/link";
+import ConfirmOwnership from "@/components/ConfirmOwnership";
+import { getOwnershipGate } from "@/lib/agreements";
 import { logEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +37,7 @@ export default async function DesignPage({
   const sold = d.status === "sold";
   if (d.status === "hidden") notFound();
   logEvent("view", { designId: d._id });
+  const gate = await getOwnershipGate(d._id);
 
   return (
     <div className="grid gap-10 md:grid-cols-2">
@@ -81,7 +84,11 @@ export default async function DesignPage({
           <div className="space-y-3">
             <p className="font-serif text-4xl text-violet-900">{d.price} <span className="text-2xl text-fuchsia-500">SOL</span></p>
             <div id="buy" className="scroll-mt-24">
-              {checkout === "1" ? (
+              {!gate.accepted ? (
+                <ConfirmOwnership designId={d._id} designerWallet={d.designerWallet} />
+              ) : gate.blockReason ? (
+                <p className="rounded-3xl border border-fuchsia-200 bg-fuchsia-50 p-5 text-sm text-fuchsia-900">⚖️ {gate.blockReason}</p>
+              ) : checkout === "1" ? (
                 // Buyer has read the Exclusive Ownership Terms → show the checkout
                 <BuyButton designId={d._id} title={d.title} price={d.price} designerWallet={d.designerWallet} initialOpen />
               ) : (
@@ -102,6 +109,12 @@ export default async function DesignPage({
             href={`https://explorer.solana.com/address/${d.mintAddress}?cluster=devnet`}>
             ⛓️ Ownership token on Solana: {short(d.mintAddress)}
           </a>
+        )}
+        {gate.accepted && (
+          <p className="text-xs text-stone-500">
+            ✍️ Designer accepted the ownership transfer declaration (v{gate.agreementVersion}) on{" "}
+            {new Date(gate.acceptedAt!).toLocaleDateString()}.
+          </p>
         )}
         <Link href={`/certificate/${d._id}`} className="block text-sm font-semibold text-violet-700 hover:underline">
           📜 View Certificate of Creation

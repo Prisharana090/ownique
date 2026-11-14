@@ -69,6 +69,7 @@ Ownique is a design marketplace where **every design sells exactly once**.
 | GoDaddy Registry | [yourdomain] |
 
 ## Trust & safety
+- **Designer Ownership Transfer Declaration:** before a design can be sold, the designer enters their legal name, reviews and accepts a versioned declaration, confirms their authority to transfer the rights, and signs it with their wallet. We save the designer's user ID, legal name, design ID, agreement version, timestamp and status. Without it, the design shows "Designer ownership confirmation required" and can't be bought. Designs with third-party content are flagged for a separate rights review. (A declaration records a promise; it doesn't by itself prove authorship.)
 - Before checkout, buyers see an **Exclusive Ownership Terms** screen for that exact design: what they're getting (exclusive copyright transfer, commercial use, reproduce, modify, manufacture, sell), designer credit, and one-owner rules.
 - Designers and buyers each tick 5 clear confirmations before listing or buying, and designers **sign their originality agreement with their wallet**, so nobody can list designs in someone else's name.
 - Payments are verified on-chain, and each payment can only be used once.

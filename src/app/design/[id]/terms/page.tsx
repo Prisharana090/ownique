@@ -6,6 +6,7 @@ import { Design } from "@/models/Design";
 import { User } from "@/models/User";
 import { short } from "@/lib/short";
 import { solToUsd } from "@/lib/nessie";
+import { getOwnershipGate } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,8 @@ export default async function OwnershipTermsPreview({ params }: { params: Promis
 
   const designer = await User.findOne({ walletAddress: d.designerWallet }).select("username").lean<{ username?: string }>();
   const designerName = designer?.username || short(d.designerWallet);
-  const available = d.status === "listed";
+  const gate = await getOwnershipGate(d._id);
+  const available = d.status === "listed" && !gate.blockReason;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -80,6 +82,14 @@ export default async function OwnershipTermsPreview({ params }: { params: Promis
             <dd className="text-base text-stone-800">
               <span className="font-serif text-2xl text-violet-900">{d.price} SOL</span>
               <span className="ml-2 text-stone-500">or ${solToUsd(d.price)} by bank</span>
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-400">Designer ownership declaration</dt>
+            <dd className="text-stone-800">
+              {gate.accepted
+                ? `Accepted (version ${gate.agreementVersion}) on ${new Date(gate.acceptedAt!).toLocaleDateString()}`
+                : "Not yet accepted. Designer ownership confirmation required."}
             </dd>
           </div>
           <div className="sm:col-span-2">
@@ -140,10 +150,12 @@ export default async function OwnershipTermsPreview({ params }: { params: Promis
               These terms are a plain-language summary, not legal advice.
             </p>
           </>
-        ) : (
+        ) : d.status !== "listed" ? (
           <p className="rounded-2xl bg-blush px-6 py-4 text-violet-900">
             This design already has its one owner, so it&apos;s no longer available to buy.
           </p>
+        ) : (
+          <p className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-6 py-4 text-fuchsia-900">🔒 {gate.blockReason}</p>
         )}
       </div>
     </div>

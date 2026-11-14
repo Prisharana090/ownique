@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { maskCanvas, renderMockup, type Blend, type Pt } from "@/lib/mockup";
 import { DEFAULT_COLORS, customizeArt, isCustomized, type ColorSettings } from "@/lib/artColor";
 import DesignColors from "./DesignColors";
+import bs58 from "bs58";
+import Link from "next/link";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { replyPrefix } from "@/lib/objectRequests";
 
 type D = { _id: string; title: string; status: string };
 type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off = per-corner perspective offsets (× width)
@@ -27,6 +31,12 @@ const loadImg = (src: string) => new Promise<HTMLImageElement>((ok, fail) => {
 
 export default function TryOn() {
   const params = useSearchParams();
+  const requestId = params.get("request"); // opened from a "Design My Object" request
+  const { publicKey, signMessage } = useWallet();
+  const [reqInfo, setReqInfo] = useState<{ material: string; style: string } | null>(null);
+  const [sendKind, setSendKind] = useState<"manual" | "ai">("manual");
+  const [why, setWhy] = useState("");
+  const [sendState, setSendState] = useState<{ busy?: boolean; error?: string; done?: boolean }>({});
   const [designs, setDesigns] = useState<D[]>([]);
   const [designId, setDesignId] = useState(params.get("design") ?? "");
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
@@ -133,6 +143,37 @@ export default function TryOn() {
     } catch {
       URL.revokeObjectURL(url);
       setError("That file couldn't be opened as an image. Try another photo.");
+    }
+  }
+
+  // From a request: use the buyer's object photo (no upload needed).
+  useEffect(() => {
+    if (!requestId) return;
+    fetch(`/api/requests/${requestId}`).then((r) => r.json()).then((d) => d.request && setReqInfo(d.request)).catch(() => {});
+    fetch(`/api/requests/${requestId}/photo`).then((r) => { if (!r.ok) throw new Error(); return r.blob(); })
+      .then((b) => pickFile(new File([b], "object.jpg", { type: "image/jpeg" })))
+      .catch(() => setError("Couldn't load the buyer's object photo."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestId]);
+
+  async function sendSuggestion() {
+    const chosen = sendKind === "ai" ? aiResult : result;
+    if (!requestId || !chosen || !designId) return;
+    if (!publicKey || !signMessage) return setSendState({ error: "Connect your wallet first." });
+    setSendState({ busy: true });
+    try {
+      const mockup = await (await fetch(chosen.url)).blob();
+      const message = `${replyPrefix(requestId, designId)} at ${Date.now()}`;
+      const signature = bs58.encode(await signMessage(new TextEncoder().encode(message)));
+      const form = new FormData();
+      Object.entries({ designId, designerWallet: publicKey.toBase58(), message, signature, explanation: why.trim(), kind: sendKind }).forEach(([k, v]) => form.append(k, v));
+      form.append("mockup", mockup, "mockup.jpg");
+      const res = await fetch(`/api/requests/${requestId}/replies`, { method: "POST", body: form });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error);
+      setSendState({ done: true });
+    } catch (e) {
+      setSendState({ error: e instanceof Error ? e.message : "Couldn't send your suggestion." });
     }
   }
 
@@ -264,6 +305,13 @@ export default function TryOn() {
         <h1 className="font-serif text-4xl font-semibold text-violet-900">Try It On</h1>
         <p className="text-stone-600">See a design on your own cup, vase, shirt or anything else before you buy. Everything happens in your browser.</p>
       </div>
+
+      {requestId && (
+        <p className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-4 text-sm text-fuchsia-900">
+          Designing for a buyer&apos;s request{reqInfo ? ` (${reqInfo.material}${reqInfo.style ? `, ${reqInfo.style}` : ""})` : ""}. Their object photo is loaded below.{" "}
+          <Link href={`/requests/${requestId}`} className="font-semibold underline">Back to the request</Link>
+        </p>
+      )}
 
       <div className="grid gap-4 rounded-3xl border border-[#ece3d9] bg-white/80 p-5 shadow-sm sm:grid-cols-2">
         <label className="block">
@@ -415,6 +463,34 @@ export default function TryOn() {
       </section>
 
       {aiResult && <Compare r={aiResult} title="AI Try-On" kind="ai" label={AI_LABEL} selected={selected} />}
+
+      {requestId && (result || aiResult) && (
+        <section className="space-y-3 rounded-3xl border border-violet-200 bg-white p-5 shadow-sm">
+          <h2 className={step}>Send to the buyer&apos;s request</h2>
+          {sendState.done ? (
+            <p className="rounded-xl bg-violet-50 p-3 text-sm text-violet-900">Sent! <Link href={`/requests/${requestId}`} className="font-semibold underline">See it on the request →</Link></p>
+          ) : (
+            <>
+              <fieldset className="flex flex-wrap gap-2 text-sm">
+                <legend className="mb-1 font-medium text-stone-800">Which mockup?</legend>
+                {result && <label className="flex items-center gap-2 rounded-full border border-stone-300 px-3 py-1.5"><input type="radio" name="kind" className="accent-violet-600" checked={sendKind === "manual"} onChange={() => setSendKind("manual")} /> Manual mockup</label>}
+                {aiResult && <label className="flex items-center gap-2 rounded-full border border-stone-300 px-3 py-1.5"><input type="radio" name="kind" className="accent-violet-600" checked={sendKind === "ai"} onChange={() => setSendKind("ai")} /> AI-generated preview</label>}
+              </fieldset>
+              <label className="block text-sm font-medium text-stone-800">Why it suits this object and material
+                <textarea value={why} onChange={(e) => setWhy(e.target.value)} maxLength={500} rows={3}
+                  placeholder="e.g. The soft florals wrap nicely around a ceramic vase and the colors suit a glossy glaze."
+                  className="mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2" />
+              </label>
+              <p className="text-xs text-stone-500">The buyer sees your mockup (still watermarked), your design&apos;s live price and a link to its listing. Only designs you listed can be suggested.</p>
+              {sendState.error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{sendState.error}</p>}
+              <button onClick={sendSuggestion} disabled={sendState.busy || why.trim().length < 10 || (sendKind === "manual" ? !result : !aiResult)}
+                className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
+                {sendState.busy ? "Sign in your wallet…" : "Send suggestion"}
+              </button>
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }

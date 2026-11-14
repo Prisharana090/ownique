@@ -123,3 +123,12 @@ export async function getOwnershipGate(designId: string): Promise<OwnershipGate>
     designerAgreementId: String(a._id),
   };
 }
+
+/** Fills the card badge fields from the real signed declarations (current version), not a cached copy. */
+export async function withOwnershipStatus<T extends { _id: string; ownershipConfirmed?: boolean; rightsReview?: string }>(list: T[]): Promise<T[]> {
+  if (!list.length) return list;
+  const accepted = await DesignerAgreement.find({ designId: { $in: list.map((d) => d._id) }, status: "accepted", agreementVersion: DECLARATION_VERSION })
+    .select("designId rightsReview").lean<{ designId: unknown; rightsReview: string }[]>();
+  const byId = new Map(accepted.map((a) => [String(a.designId), a.rightsReview]));
+  return list.map((d) => ({ ...d, ownershipConfirmed: byId.has(String(d._id)), rightsReview: byId.get(String(d._id)) ?? d.rightsReview ?? "not_needed" }));
+}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import DesignCard, { type DesignSummary } from "@/components/DesignCard";
+import { withOwnershipStatus } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ async function getHomeData() {
     Design.countDocuments({ status: "sold" }),
     Design.distinct("designerWallet").then((d) => d.length),
   ]);
-  return { featured: JSON.parse(JSON.stringify(docs)) as DesignSummary[], listed, sold, designers };
+  return { featured: await withOwnershipStatus(JSON.parse(JSON.stringify(docs)) as DesignSummary[]), listed, sold, designers };
 }
 
 export default async function Home() {

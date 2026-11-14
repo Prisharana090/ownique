@@ -13,6 +13,7 @@ const links = [
   { href: "/shop", label: "Shop" },
   { href: "/upload", label: "Sell a design" },
   { href: "/try-on", label: "Try It On" },
+  { href: "/requests", label: "Design My Object" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/agreements", label: "My Agreements" },
   { href: "/policy", label: "How it works & terms" },
@@ -31,7 +32,7 @@ export default function Navbar() {
           <WalletMultiButton style={{ height: 40, borderRadius: 999, fontSize: 14, padding: "0 18px" }} />
         </div>
         {/* On phones the links become one swipeable row under the logo. */}
-        <div className="-mx-1 flex w-full gap-5 overflow-x-auto whitespace-nowrap px-1 pb-1 text-sm font-medium text-stone-700 md:w-auto md:flex-1 md:justify-end md:overflow-visible md:pb-0">
+        <div className="-mx-1 flex w-full gap-5 overflow-x-auto whitespace-nowrap px-1 pb-1 [scrollbar-width:none] text-sm font-medium text-stone-700 md:w-auto md:flex-1 md:justify-end md:overflow-visible md:pb-0">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="rounded transition hover:text-violet-700">
               {l.label}

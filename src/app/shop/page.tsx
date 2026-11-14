@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design, CATEGORIES } from "@/models/Design";
 import DesignCard, { type DesignSummary } from "@/components/DesignCard";
+import { withOwnershipStatus } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function Shop({ searchParams }: { searchParams: Promise<{ c
     const filter: Record<string, unknown> = { status: { $ne: "hidden" } };
     if (category) filter.category = category;
     const docs = await Design.find(filter).sort({ createdAt: -1 }).lean();
-    designs = JSON.parse(JSON.stringify(docs));
+    designs = await withOwnershipStatus(JSON.parse(JSON.stringify(docs)));
   }
 
   return (

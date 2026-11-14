@@ -4,6 +4,7 @@ import { Design } from "@/models/Design";
 import { User } from "@/models/User";
 import DesignCard, { type DesignSummary } from "@/components/DesignCard";
 import { short } from "@/lib/short";
+import { withOwnershipStatus } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function Profile({ params }: { params: Promise<{ wallet: st
     Design.find({ designerWallet: wallet, status: { $ne: "hidden" } }).sort({ createdAt: -1 }).lean(),
     Design.find({ ownerWallet: wallet, status: "sold" }).sort({ soldAt: -1 }).lean(),
   ]);
-  const createdList: DesignSummary[] = JSON.parse(JSON.stringify(created));
+  const createdList: DesignSummary[] = await withOwnershipStatus(JSON.parse(JSON.stringify(created)));
   const ownedList: DesignSummary[] = JSON.parse(JSON.stringify(owned));
   const sales = createdList.filter((d) => d.status === "sold");
   const earned = sales.reduce((sum, d) => sum + d.price, 0);

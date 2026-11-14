@@ -83,6 +83,7 @@ const privacy: Section[] = [
       "The designs you upload, with their title, price and the time you agreed to these terms.",
       "Activity like views, try-ons and sales, used only to power the live dashboard.",
       "Reports you send, so we can review them.",
+      "Object photos you post to Design My Object, which are shown publicly on your request (hidden photo data such as location is removed), and designers' suggested mockups.",
       "Your legal name when you sign an ownership transfer declaration. It's stored privately with that agreement and never shown publicly.",
       "Try It On mockups are made in your browser, so your photo stays on your device. Only if you click AI-Enhanced Preview are your photo, the design's watermarked preview and your mockup sent to Cloudflare Workers AI to create the image. Ownique doesn't save them.",
       "Messages to Ask Ownique are sent to Grok (xAI) to get an answer and are not saved by Ownique.",

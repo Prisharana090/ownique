@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { renderMockup, type Blend, type Pt } from "@/lib/mockup";
 import { detectProduct } from "@/lib/productMask";
+import { TEMPLATES, type ProductTemplate } from "@/lib/templates";
 import { DEFAULT_COLORS, customizeArt, isCustomized, type ColorSettings } from "@/lib/artColor";
 import DesignColors from "./DesignColors";
 
@@ -13,7 +14,7 @@ type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const LABEL = "Product mockup—final appearance may vary.";
-const AI_LABEL = "AI-generated approximation—details and final appearance may vary.";
+const AI_LABEL = "AI-generated preview—details and final appearance may vary.";
 const BLENDS: [Blend, string][] = [
   ["multiply", "Multiply (printed look)"], ["source-over", "Normal"], ["overlay", "Overlay"],
   ["soft-light", "Soft light"], ["screen", "Screen (light products)"], ["darken", "Darken"],
@@ -56,6 +57,8 @@ export default function TryOn() {
   const [areaMode, setAreaMode] = useState<"off" | "draw" | "edit">("off");
   // Automatic product detection (on by default): the design can never leave the product.
   const [autoOn, setAutoOn] = useState(true);
+  const [template, setTemplate] = useState<ProductTemplate | null>(null);
+  const [curve, setCurve] = useState(0); // 0-100: wrap around round products
   const [sensitivity, setSensitivity] = useState(30);
   const [showArea, setShowArea] = useState(false);
   const product = useMemo(() => (photo ? detectProduct(photo, sensitivity) : null), [photo, sensitivity]);
@@ -120,8 +123,17 @@ export default function TryOn() {
   // Start (or reset) the placement when the photo or artwork changes.
   const reset = useCallback(() => {
     if (!photo || !art) return;
+    if (template) {
+      // Centre the design in the template's print area, filling most of its width.
+      const xs = template.area.map((p) => p.x), ys = template.area.map((p) => p.y);
+      const sx = photo.naturalWidth / 1000, sy = photo.naturalHeight / 1000;
+      const bw = (Math.max(...xs) - Math.min(...xs)) * sx, bh = (Math.max(...ys) - Math.min(...ys)) * sy;
+      const w = Math.min(bw * 0.8, (bh * 0.8 * art.naturalWidth) / art.naturalHeight);
+      setPlace({ c: { x: ((Math.max(...xs) + Math.min(...xs)) / 2) * sx, y: ((Math.max(...ys) + Math.min(...ys)) / 2) * sy }, w, rot: 0, off: ZERO() });
+      return;
+    }
     setPlace({ c: { x: photo.naturalWidth / 2, y: photo.naturalHeight / 2 }, w: photo.naturalWidth * 0.35, rot: 0, off: ZERO() });
-  }, [photo, art]);
+  }, [photo, art, template]);
   useEffect(reset, [reset]);
 
   useEffect(() => {
@@ -149,16 +161,16 @@ export default function TryOn() {
       const k = (boxW * (window.devicePixelRatio || 1)) / photo.naturalWidth;
       try {
         renderMockup(canvas.current!, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
-          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12, mask: mask(), feather: 1.5 * (window.devicePixelRatio || 1) });
+          photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 12, mask: mask(), feather: 1.5 * (window.devicePixelRatio || 1), curve: curve / 100 });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Preview failed.");
       }
     });
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photo, art, artView, place, opacity, blend, boxW, corners, allowed]);
+  }, [photo, art, artView, place, opacity, blend, boxW, corners, allowed, curve]);
 
-  async function pickFile(f: File | null) {
+  async function pickFile(f: File | null, tpl: ProductTemplate | null = null) {
     setError(null);
     setResult(null);
     setAiResult(null);
@@ -172,11 +184,24 @@ export default function TryOn() {
       setPhoto(img);
       setPhotoUrl(url);
       setPhotoFile(f);
-      setArea([]);
+      setTemplate(tpl);
+      // Built-in templates come with their print area and surface curve; uploads use automatic detection.
+      setArea(tpl ? tpl.area.map((p) => ({ x: (p.x * img.naturalWidth) / 1000, y: (p.y * img.naturalHeight) / 1000 })) : []);
       setAreaMode("off");
+      setAutoOn(!tpl);
+      setCurve(tpl ? Math.round(tpl.curve * 100) : 0);
     } catch {
       URL.revokeObjectURL(url);
       setError("That file couldn't be opened as an image. Try another photo.");
+    }
+  }
+
+  async function pickTemplate(t: ProductTemplate) {
+    try {
+      const blob = await (await fetch(t.src)).blob();
+      await pickFile(new File([blob], `${t.id}.jpg`, { type: "image/jpeg" }), t);
+    } catch {
+      setError("Couldn't load that product template.");
     }
   }
 
@@ -238,7 +263,7 @@ export default function TryOn() {
       const k = Math.min(1, 2400 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const out = document.createElement("canvas");
       renderMockup(out, photo, artView, corners(place).map((q) => ({ x: q.x * k, y: q.y * k })),
-        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24, mask: mask(), feather: 2 });
+        photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 24, mask: mask(), feather: 2, curve: curve / 100 });
       const blob = await new Promise<Blob | null>((ok) => out.toBlob(ok, "image/jpeg", 0.92));
       if (!blob) throw new Error("Couldn't create the preview.");
       if (result) URL.revokeObjectURL(result.url);
@@ -259,7 +284,7 @@ export default function TryOn() {
     try {
       const k = Math.min(1, 512 / Math.max(photo.naturalWidth, photo.naturalHeight));
       const g = document.createElement("canvas");
-      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16, mask: mask(), feather: 1 });
+      renderMockup(g, photo, artView, corners(place).map((p) => ({ x: p.x * k, y: p.y * k })), photo.naturalWidth * k, photo.naturalHeight * k, { opacity: opacity / 100, blend, grid: 16, mask: mask(), feather: 1, curve: curve / 100 });
       const guide = await new Promise<Blob | null>((ok) => g.toBlob(ok, "image/jpeg", 0.9));
       if (!guide) throw new Error("Couldn't prepare the mockup.");
       const form = new FormData();
@@ -321,6 +346,11 @@ export default function TryOn() {
   const step = "font-serif text-lg font-semibold text-violet-900";
   const handle = "absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-violet-300 bg-white text-xs text-violet-700 shadow touch-none";
   const selected = designs.find((d) => d._id === designId);
+  // Versioned preview URL so changed artwork never shows a stale cached picture.
+  const previewUrl = (id: string) => {
+    const v = designs.find((d) => d._id === id)?.imageHash?.slice(0, 8);
+    return `/api/designs/${id}/image${v ? `?v=${v}` : ""}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -331,18 +361,29 @@ export default function TryOn() {
 
       <div className="grid gap-4 rounded-3xl border border-[#ece3d9] bg-white/80 p-5 shadow-sm sm:grid-cols-2">
         <label className="block">
-          <span className={step}>1. Upload your product photo</span>
+          <span className={step}>1. Upload a photo or pick a free product</span>
           <input type="file" accept="image/jpeg,image/png,image/webp"
             className="mt-2 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-violet-100 file:px-4 file:py-2 file:font-semibold file:text-violet-800 hover:file:bg-violet-200"
             onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
           <span className="mt-1 block text-xs text-stone-500">JPG, PNG or WebP, up to 10MB. Your photo never leaves your device.</span>
+          <span className="mt-3 block text-xs font-semibold uppercase tracking-wide text-stone-500">Or try a plain product</span>
+          <span className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7">
+            {TEMPLATES.map((t) => (
+              <button key={t.id} type="button" onClick={() => pickTemplate(t)} aria-pressed={template?.id === t.id} title={t.name}
+                className={`overflow-hidden rounded-xl border bg-white text-[11px] text-stone-700 ${template?.id === t.id ? "border-violet-500 ring-2 ring-violet-200" : "border-stone-200 hover:border-violet-300"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={t.src} alt="" className="aspect-square w-full object-cover" />
+                <span className="block truncate px-1 py-1">{t.name}</span>
+              </button>
+            ))}
+          </span>
         </label>
         <label className="block">
           <span className={step}>2. Choose a design</span>
           <div className="mt-2 flex items-center gap-3">
             {designId && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/api/designs/${designId}/image`} alt="" className="h-12 w-12 rounded-xl border border-stone-200 object-cover" />
+              <img src={previewUrl(designId)} alt="" className="h-12 w-12 rounded-xl border border-stone-200 object-cover" />
             )}
             <select value={designId} onChange={(e) => { setDesignId(e.target.value); setResult(null); }}
               className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2">
@@ -459,6 +500,10 @@ export default function TryOn() {
           {art && <DesignColors art={art} preview={artView} value={colors} onChange={setColors} />}
 
           <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+            <label>Surface curve: {curve}%
+              <input type="range" min={0} max={100} value={curve} onChange={(e) => setCurve(+e.target.value)} className="block w-full accent-violet-600" aria-describedby="curve-help" />
+              <span id="curve-help" className="block text-xs text-stone-500">Wraps the design around round products like mugs, cans and pots.</span>
+            </label>
             <label>Opacity: {opacity}%
               <input type="range" min={20} max={100} value={opacity} onChange={(e) => setOpacity(+e.target.value)} className="block w-full accent-violet-600" />
             </label>
@@ -481,10 +526,10 @@ export default function TryOn() {
         </div>
       </section>
 
-      {result && <Compare r={result} title="Product Mockup" kind="manual" label={LABEL} download selected={selected} />}
+      {result && <Compare thumbUrl={previewUrl(result.designId)} r={result} title="After · Manual mockup" kind="manual" label={LABEL} download selected={selected} />}
 
       <section className="space-y-3 rounded-3xl border border-violet-200 bg-violet-50/50 p-5">
-        <h2 className={step}>Optional: AI Try-On</h2>
+        <h2 className={step}>5. Optional: Generate AI Preview</h2>
         <p className="text-sm text-stone-600">
           This sends your product photo, the design&apos;s watermarked preview and your mockup (placement, size, rotation and colors)
           to {ai?.provider === "gemini" ? "Google Gemini" : ai?.provider === "cloudflare" ? "Cloudflare Workers AI" : "an AI image service"} to create a
@@ -495,24 +540,24 @@ export default function TryOn() {
         {ai?.available && <p className="text-xs text-stone-500">AI previews left today (whole site): {ai.remaining}</p>}
         <button onClick={() => aiPreview(photoFile)} disabled={!photoFile || !place || aiBusy || !ai?.available || ai.remaining <= 0}
           className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
-          {aiBusy ? "Generating AI Try-On… (up to a minute)" : aiError ? "Try again" : "Generate AI Try-On"}
+          {aiBusy ? "Generating AI preview… (up to a minute)" : aiError ? "Try again" : "Generate AI Preview"}
         </button>
         {aiError && !aiBusy && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{aiError}</p>}
       </section>
 
-      {aiResult && <Compare r={aiResult} title="AI Try-On" kind="ai" label={AI_LABEL} selected={selected} />}
+      {aiResult && <Compare thumbUrl={previewUrl(aiResult.designId)} r={aiResult} title="After · AI preview" kind="ai" label={AI_LABEL} selected={selected} />}
     </div>
   );
 }
 
-function Compare({ r, title, kind, label, download, selected }: {
-  r: { url: string; original: string; designId: string; thumb?: string }; title: string; kind: "manual" | "ai"; label: string; download?: boolean; selected?: D;
+function Compare({ r, title, kind, label, download, selected, thumbUrl }: {
+  r: { url: string; original: string; designId: string; thumb?: string }; title: string; kind: "manual" | "ai"; label: string; download?: boolean; selected?: D; thumbUrl: string;
 }) {
   return (
     <section className="space-y-3">
       <div className="grid gap-4 md:grid-cols-2">
         <figure className="space-y-2">
-          <figcaption className="text-sm font-semibold text-stone-600">Original Photo</figcaption>
+          <figcaption className="text-sm font-semibold text-stone-600">Before</figcaption>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={r.original} alt="Your original product photo" className="w-full rounded-2xl border border-stone-200 bg-white object-contain" />
         </figure>
@@ -527,7 +572,7 @@ function Compare({ r, title, kind, label, download, selected }: {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={r.url} alt={title} className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={r.thumb ?? `/api/designs/${r.designId}/image`} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
+            <img src={r.thumb ?? thumbUrl} alt={`Selected design${selected ? `: ${selected.title}` : ""}`}
               className="absolute right-3 top-3 h-14 w-14 rounded-xl border-2 border-white bg-[conic-gradient(#eee_25%,#fff_0_50%,#eee_0_75%,#fff_0)] bg-[length:12px_12px] object-contain shadow-md sm:h-16 sm:w-16" />
           </div>
         </figure>

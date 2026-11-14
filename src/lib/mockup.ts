@@ -55,10 +55,11 @@ export type Blend = "source-over" | "multiply" | "overlay" | "soft-light" | "scr
  * The artwork is warped on its own layer first, then blended onto the photo once (no seams in blend modes).
  */
 export function renderMockup(
-  canvas: HTMLCanvasElement, photo: CanvasImageSource, art: HTMLImageElement | HTMLCanvasElement,
+  canvas: HTMLCanvasElement, photo: CanvasImageSource, artIn: HTMLImageElement | HTMLCanvasElement,
   quad: Pt[], width: number, height: number,
-  opts: { opacity: number; blend: Blend; grid?: number; mask?: Pt[] | HTMLCanvasElement; feather?: number }
+  opts: { opacity: number; blend: Blend; grid?: number; mask?: Pt[] | HTMLCanvasElement; feather?: number; curve?: number }
 ) {
+  let art: HTMLImageElement | HTMLCanvasElement = artIn;
   canvas.width = Math.round(width);
   canvas.height = Math.round(height);
   const ctx = canvas.getContext("2d");
@@ -70,6 +71,8 @@ export function renderMockup(
   layer.width = canvas.width;
   layer.height = canvas.height;
   const lctx = layer.getContext("2d")!;
+  // Round products (mug, can, glass, pot): wrap the artwork around a cylinder first.
+  if (opts.curve && opts.curve > 0.01) art = wrapCylinder(art, opts.curve);
   lctx.imageSmoothingQuality = "high";
   const map = squareToQuad(quad);
   const n = opts.grid ?? 16;
@@ -125,4 +128,30 @@ export function maskCanvas(pts: Pt[], width: number, height: number) {
   ctx.fillStyle = "#fff";
   ctx.fill();
   return c;
+}
+
+/**
+ * Cylinder wrap: columns near the left/right edges are compressed (like a label seen on a mug or can),
+ * and the edges are gently shaded. Transparency is preserved (shading uses source-atop).
+ */
+function wrapCylinder(art: HTMLImageElement | HTMLCanvasElement, curve: number) {
+  const w = art instanceof HTMLImageElement ? art.naturalWidth : art.width;
+  const h = art instanceof HTMLImageElement ? art.naturalHeight : art.height;
+  const out = document.createElement("canvas");
+  out.width = w; out.height = h;
+  const ctx = out.getContext("2d")!;
+  const A = Math.max(0.05, curve) * 1.35; // half-angle of the visible arc (radians)
+  for (let i = 0; i < w; i++) {
+    const x = ((i + 0.5) / w) * 2 - 1;
+    const u = (Math.asin(x * Math.sin(A)) / A + 1) / 2;
+    ctx.drawImage(art, Math.min(w - 1, Math.max(0, u * w)), 0, 1, h, i, 0, 1, h);
+  }
+  const g = ctx.createLinearGradient(0, 0, w, 0);
+  const edge = 0.3 * curve;
+  g.addColorStop(0, `rgba(0,0,0,${edge})`); g.addColorStop(0.25, "rgba(0,0,0,0)");
+  g.addColorStop(0.75, "rgba(0,0,0,0)"); g.addColorStop(1, `rgba(0,0,0,${edge})`);
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  return out;
 }

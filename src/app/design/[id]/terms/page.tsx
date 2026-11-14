@@ -11,6 +11,7 @@ import { getOwnershipGate } from "@/lib/agreements";
 export const dynamic = "force-dynamic";
 
 type D = {
+  imageHash?: string;
   _id: string; title: string; price: number; category: string; status: string;
   designerWallet: string; ownerWallet?: string | null; createdAt: string;
 };
@@ -65,7 +66,7 @@ export default async function OwnershipTermsPreview({ params }: { params: Promis
       {/* Design summary */}
       <section className="grid gap-6 rounded-[2rem] border border-[#ece3d9] bg-white/80 p-6 shadow-sm sm:grid-cols-[220px_1fr] sm:p-8">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/api/designs/${d._id}/image`} alt={d.title} className="aspect-square w-full rounded-2xl border border-white object-cover shadow-md" />
+        <img src={`/api/designs/${d._id}/image${d.imageHash ? `?v=${String(d.imageHash).slice(0, 8)}` : ""}`} alt={d.title} className="aspect-square w-full rounded-2xl border border-white object-cover shadow-md" />
         <dl className="grid content-center gap-4 text-sm sm:grid-cols-2">
           <div className="sm:col-span-2">
             <dt className="text-xs font-semibold uppercase tracking-wide text-stone-400">Design</dt>

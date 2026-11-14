@@ -8,7 +8,7 @@ import { detectProduct } from "@/lib/productMask";
 import { DEFAULT_COLORS, customizeArt, isCustomized, type ColorSettings } from "@/lib/artColor";
 import DesignColors from "./DesignColors";
 
-type D = { _id: string; title: string; status: string };
+type D = { _id: string; title: string; status: string; imageHash?: string };
 type Place = { c: Pt; w: number; rot: number; off: Pt[] }; // photo pixels; off = per-corner perspective offsets (× width)
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -112,8 +112,10 @@ export default function TryOn() {
     setArt(null);
     setColors(DEFAULT_COLORS);
     if (!designId) return;
-    loadImg(`/api/designs/${designId}/image`).then(setArt).catch(() => setError("Couldn't load that design's preview."));
-  }, [designId]);
+    const v = designs.find((d) => d._id === designId)?.imageHash?.slice(0, 8);
+    loadImg(`/api/designs/${designId}/image${v ? `?v=${v}` : ""}`).then(setArt).catch(() => setError("Couldn't load that design's preview."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designId, designs.length]);
 
   // Start (or reset) the placement when the photo or artwork changes.
   const reset = useCallback(() => {

@@ -99,7 +99,7 @@ export default async function Home() {
                   className={`group overflow-hidden rounded-3xl border border-white bg-white shadow-md transition hover:-translate-y-1 hover:shadow-xl ${i % 2 ? "mt-10" : ""}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/designs/${d._id}/image`} alt={d.title} className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-105" />
+                  <img src={`/api/designs/${d._id}/image${d.imageHash ? `?v=${String(d.imageHash).slice(0, 8)}` : ""}`} alt={d.title} className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-105" />
                   <p className="px-4 py-3 font-serif text-sm text-violet-900">{d.title}</p>
                 </Link>
               ))}

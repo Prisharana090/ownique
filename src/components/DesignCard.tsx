@@ -11,6 +11,7 @@ export type DesignSummary = {
   ownerWallet?: string | null;
   ownershipConfirmed?: boolean;
   rightsReview?: string;
+  imageHash?: string;
 };
 
 /** `masonry`: image keeps its natural shape (Pinterest-style columns). Default: square grid tile. */
@@ -24,7 +25,7 @@ export default function DesignCard({ d, masonry = false }: { d: DesignSummary; m
     >
       <div className={`relative overflow-hidden bg-blush ${masonry ? "min-h-32" : "aspect-square"}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/api/designs/${d._id}/image`} alt="" loading="lazy"
+        <img src={`/api/designs/${d._id}/image${d.imageHash ? `?v=${d.imageHash.slice(0, 8)}` : ""}`} alt="" loading="lazy"
           className={`w-full transition duration-500 group-hover:scale-105 ${masonry ? "h-auto" : "h-full object-cover"}`} />
         <span className="absolute left-3 top-3 rounded-full bg-violet-100/95 px-3 py-1 text-xs font-medium capitalize text-violet-800 backdrop-blur">
           {d.category}

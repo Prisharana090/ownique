@@ -76,7 +76,7 @@ export default async function Certificate({ params }: { params: Promise<{ id: st
 
         <div className="mt-8 grid gap-8 sm:grid-cols-[200px_1fr]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/designs/${d._id}/image`} alt={d.title} className="w-full rounded-xl border border-stone-200" />
+          <img src={`/api/designs/${d._id}/image${d.imageHash ? `?v=${String(d.imageHash).slice(0, 8)}` : ""}`} alt={d.title} className="w-full rounded-xl border border-stone-200" />
           <dl className="space-y-3 text-sm">
             {rows.map(([k, v]) => (
               <div key={k}>

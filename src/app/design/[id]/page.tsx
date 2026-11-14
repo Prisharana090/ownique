@@ -14,6 +14,7 @@ import { logEvent } from "@/lib/events";
 export const dynamic = "force-dynamic";
 
 type D = {
+  imageHash?: string;
   _id: string; title: string; price: number; category: string; status: string;
   designerWallet: string; ownerWallet?: string | null; description: string; tags: string[];
   describedByGrok: boolean; soldAt?: string | null; txSignature?: string | null; mintAddress?: string | null;
@@ -43,7 +44,7 @@ export default async function DesignPage({
     <div className="grid gap-10 md:grid-cols-2">
       <div className="relative overflow-hidden rounded-[2rem] border-8 border-white bg-white shadow-xl">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/api/designs/${d._id}/image`} alt={d.title} className="w-full object-cover" />
+        <img src={`/api/designs/${d._id}/image${d.imageHash ? `?v=${String(d.imageHash).slice(0, 8)}` : ""}`} alt={d.title} className="w-full object-cover" />
       </div>
 
       <div className="space-y-6">

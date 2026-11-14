@@ -110,7 +110,44 @@ export function applyColors(src: ImageData, s: ColorSettings): ImageData {
       }
     }
   }
+  if (s.hideBg) dropSmallIslands(out);
   return out;
+}
+
+/**
+ * After hiding the background, the watermark letters that sat on it (and other specks) survive as small floating
+ * islands. Keep only the big connected shapes of the design; remove islands smaller than ~0.4% of the image.
+ * The watermark printed ON the design itself is untouched.
+ */
+function dropSmallIslands(img: ImageData) {
+  const { width: w, height: h, data: d } = img;
+  const n = w * h, label = new Int32Array(n).fill(-1), sizes: number[] = [];
+  const stack = new Int32Array(n);
+  for (let start = 0; start < n; start++) {
+    if (label[start] !== -1 || d[start * 4 + 3] < 40) continue;
+    const id = sizes.length;
+    let top = 0, size = 0;
+    stack[top++] = start; label[start] = id;
+    while (top) {
+      const p = stack[--top]; size++;
+      const x = p % w, y = (p - x) / w;
+      const nb = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
+      for (const q of nb) if (q >= 0 && label[q] === -1 && d[q * 4 + 3] >= 40) { label[q] = id; stack[top++] = q; }
+    }
+    sizes.push(size);
+  }
+  const min = n * 0.004;
+  for (let p = 0; p < n; p++) {
+    const id = label[p];
+    if (id === -1 ? d[p * 4 + 3] > 0 && !hasBigNeighbour(p) : sizes[id] < min) d[p * 4 + 3] = 0;
+  }
+  // faint edge pixels (alpha < 40) are kept only next to a big shape
+  function hasBigNeighbour(p: number) {
+    const x = p % w;
+    for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p - w, p + w])
+      if (q >= 0 && q < n && label[q] !== -1 && sizes[label[q]] >= min) return true;
+    return false;
+  }
 }
 
 /** Re-stamps the "Ownique • Preview" watermark (same style as the server) so customizing never removes it. */
@@ -143,6 +180,7 @@ export function customizeArt(img: HTMLImageElement, s: ColorSettings): HTMLCanva
   ctx.drawImage(img, 0, 0);
   if (!isCustomized(s)) return c;
   ctx.putImageData(applyColors(ctx.getImageData(0, 0, c.width, c.height), s), 0, 0);
-  stampWatermark(ctx, c.width, c.height);
+  // The preview watermark already printed on the design is kept (only background pixels are removed), and the
+  // server stamps it again on anything sent to AI. Stamping here too would double it and float text outside the shape.
   return c;
 }

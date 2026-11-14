@@ -19,19 +19,20 @@ const links = [
 
 export default function Navbar() {
   return (
-    <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-[#ece3d9] bg-cream/85 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-        <Link href="/" className="text-xl font-bold tracking-tight">
-          Own<span className="text-violet-600">ique</span>
+        {/* Logo: replace this wordmark with your own logo later (e.g. <img src="/logo.svg" />) */}
+        <Link href="/" className="font-serif text-2xl font-semibold tracking-tight text-violet-800">
+          Own<span className="italic text-fuchsia-500">ique</span>
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 text-sm font-medium text-stone-600">
           {links.map((l) => (
-            <Link key={l.href} href={l.href} className="hover:text-stone-900">
+            <Link key={l.href} href={l.href} className="transition hover:text-violet-700">
               {l.label}
             </Link>
           ))}
           <MyProfileLink />
-          <WalletMultiButton style={{ height: 40, borderRadius: 12, fontSize: 14, background: "#7c3aed" }} />
+          <WalletMultiButton style={{ height: 40, borderRadius: 999, fontSize: 14, padding: "0 18px" }} />
         </div>
       </nav>
     </header>

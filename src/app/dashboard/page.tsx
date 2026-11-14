@@ -13,7 +13,7 @@ type Stats = {
 };
 
 const COLORS: Record<string, string> = {
-  view: "#a78bfa", try_on: "#f472b6", purchase: "#7c3aed", upload: "#38bdf8", blocked_upload: "#ef4444", report: "#f59e0b",
+  view: "#d4abc3", try_on: "#dfb872", purchase: "#652f52", upload: "#9a5a80", blocked_upload: "#c2410c", report: "#a8a29e",
 };
 const LABELS: Record<string, string> = {
   view: "Views", try_on: "Try-ons", purchase: "Sales", upload: "Uploads", blocked_upload: "Copies blocked", report: "Reports",
@@ -61,7 +61,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-3xl font-bold">📈 Live dashboard</h1>
+          <h1 className="text-4xl font-semibold text-violet-900">📈 Live dashboard</h1>
           <p className="text-stone-600">Real-time activity, powered by Tiger Data. Updates every 5 seconds.</p>
         </div>
         <span className="flex items-center gap-2 text-sm text-emerald-700">
@@ -72,14 +72,14 @@ export default function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-4">
         {tiles.map((t) => (
-          <div key={t.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div key={t.label} className="rounded-3xl border border-[#ece3d9] bg-white/80 p-5 shadow-sm">
             <p className="text-sm text-stone-500">{t.label}</p>
             <p className="mt-1 text-3xl font-bold">{t.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="rounded-3xl border border-[#ece3d9] bg-white/80 p-5 shadow-sm">
         <p className="mb-4 font-semibold">Activity per minute (last hour)</p>
         {chart.length === 0 ? (
           <p className="py-16 text-center text-stone-400">No activity yet. Open a design page and watch this move!</p>
@@ -100,7 +100,7 @@ export default function Dashboard() {
       </div>
 
       {!!stats.top?.length && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-[#ece3d9] bg-white/80 p-5 shadow-sm">
           <p className="mb-3 font-semibold">🔥 Most viewed designs</p>
           <ol className="space-y-1 text-sm">
             {stats.top.map((t, i) => (

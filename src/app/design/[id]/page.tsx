@@ -31,15 +31,15 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="grid gap-10 md:grid-cols-2">
-      <div className="relative overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+      <div className="relative overflow-hidden rounded-[2rem] border-8 border-white bg-white shadow-xl">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/api/designs/${d._id}/image`} alt={d.title} className="w-full object-cover" />
       </div>
 
       <div className="space-y-6">
         <div>
-          <p className="text-sm font-medium capitalize text-violet-700">For {d.category}</p>
-          <h1 className="text-4xl font-bold">{d.title}</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-fuchsia-600">Made for {d.category}</p>
+          <h1 className="mt-2 text-5xl font-semibold text-violet-900">{d.title}</h1>
           <p className="mt-1 text-stone-500">
             Designed by{" "}
             <Link href={`/profile/${d.designerWallet}`} className="font-medium text-violet-700 hover:underline">
@@ -48,8 +48,8 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <p className="text-stone-700">{d.description}</p>
+        <div className="rounded-3xl border border-[#ece3d9] bg-white/80 p-6 shadow-sm">
+          <p className="leading-relaxed text-stone-700">{d.description}</p>
           {d.describedByGrok && <p className="mt-2 text-xs text-stone-400">✨ Written by Grok</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             {d.tags.map((t) => (
@@ -60,7 +60,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
 
         {sold ? (
           <div className="space-y-3">
-          <div className="rounded-2xl bg-stone-900 p-5 text-sm text-white">
+          <div className="rounded-3xl bg-violet-900 p-6 text-sm leading-relaxed text-violet-100">
             <b>Owned by</b> {short(d.ownerWallet)} · <b>Designed by</b> {short(d.designerWallet)}
             {d.soldAt && <> · <b>Sold</b> {new Date(d.soldAt).toLocaleDateString()}</>}
             {d.paymentMethod === "bank" && <> · <b>Paid by bank</b> (Capital One){d.priceUsd ? ` $${d.priceUsd}` : ""}</>}
@@ -72,7 +72,7 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-3xl font-bold">{d.price} SOL</p>
+            <p className="font-serif text-4xl text-violet-900">{d.price} <span className="text-2xl text-fuchsia-500">SOL</span></p>
             <BuyButton designId={d._id} title={d.title} price={d.price} designerWallet={d.designerWallet} />
             <a href={`/try-on?design=${d._id}`}
               className="block w-full rounded-xl border border-stone-300 py-3 text-center font-semibold hover:bg-stone-50">

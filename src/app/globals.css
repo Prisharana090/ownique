@@ -1,11 +1,69 @@
 @import "tailwindcss";
 
+/* 🎨 Ownique "soft & elegant" theme
+   Tailwind's violet scale is remapped to a deep plum, and fuchsia to a warm gold,
+   so every existing violet and fuchsia class picks up the new brand colors. */
+@theme {
+  --color-violet-50: #faf5f8;
+  --color-violet-100: #f4e8ef;
+  --color-violet-200: #e8d0de;
+  --color-violet-300: #d4abc3;
+  --color-violet-400: #b77c9e;
+  --color-violet-500: #9a5a80;
+  --color-violet-600: #7d3f66;
+  --color-violet-700: #652f52;
+  --color-violet-800: #4f2541;
+  --color-violet-900: #3d1d33;
+  --color-violet-950: #26111f;
+
+  --color-fuchsia-50: #fbf7ee;
+  --color-fuchsia-100: #f5ead2;
+  --color-fuchsia-200: #ebd3a3;
+  --color-fuchsia-300: #dfb872;
+  --color-fuchsia-400: #d29f4d;
+  --color-fuchsia-500: #b8893b;
+  --color-fuchsia-600: #9a6e2e;
+  --color-fuchsia-700: #7b5626;
+  --color-fuchsia-800: #634524;
+  --color-fuchsia-900: #523a20;
+
+  --color-cream: #fbf7f1;
+  --color-blush: #f3e6e0;
+}
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-playfair), Georgia, serif;
 }
 
 body {
-  background: #faf9f7;
-  color: #1c1917;
+  background: var(--color-cream);
+  color: #2b2230;
   font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-playfair), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: #ebd3a3;
+}
+
+/* Gentle fade-up for page content */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+main > * { animation: rise 0.45s ease-out both; }
+
+/* Solana wallet button in brand colors */
+.wallet-adapter-button-trigger { background: #652f52 !important; }
+.wallet-adapter-button-trigger:hover { background: #4f2541 !important; }
+
+@media print {
+  body { background: white; }
 }

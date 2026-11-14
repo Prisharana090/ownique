@@ -61,7 +61,7 @@ export default function AskOwnique() {
   return (
     <>
       <button onClick={() => setOpen((o) => !o)} aria-label="Ask Ownique"
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 font-semibold text-white shadow-lg hover:bg-violet-700">
+        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 font-semibold text-white shadow-lg hover:bg-violet-800">
         {open ? "✕ Close" : "💬 Ask Ownique"}
       </button>
 
@@ -113,7 +113,7 @@ export default function AskOwnique() {
             </label>
             <input value={text} onChange={(e) => setText(e.target.value)} placeholder={image ? "Ask about this design…" : "Ask anything…"}
               className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-violet-500" />
-            <button disabled={busy || (!text.trim() && !image)} className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            <button disabled={busy || (!text.trim() && !image)} className="rounded-full bg-violet-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">
               Send
             </button>
           </form>

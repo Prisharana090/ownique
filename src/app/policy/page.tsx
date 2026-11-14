@@ -88,7 +88,7 @@ const privacy: Section[] = [
 
 function Card({ s }: { s: Section }) {
   return (
-    <section id={s.id} className="scroll-mt-24 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+    <section id={s.id} className="scroll-mt-24 rounded-3xl border border-[#ece3d9] bg-white/80 p-6 shadow-sm">
       <h3 className="mb-2 text-xl font-semibold">{s.title}</h3>
       {s.intro && <p className="mb-3 text-stone-600">{s.intro}</p>}
       <ul className="list-disc space-y-1.5 pl-5 text-stone-700">
@@ -104,7 +104,7 @@ export default function Policy() {
   return (
     <div className="mx-auto max-w-3xl space-y-10">
       <div>
-        <h1 className="text-4xl font-bold">How it works &amp; our terms</h1>
+        <h1 className="text-4xl font-semibold text-violet-900">How it works &amp; our terms</h1>
         <p className="mt-2 text-lg text-stone-600">One design. One owner. Credit forever.</p>
         <nav className="mt-4 flex flex-wrap gap-2 text-sm">
           {[

@@ -73,7 +73,7 @@ export default function Upload() {
   return (
     <form onSubmit={submit} className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2">
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold">Sell a design</h1>
+        <h1 className="text-4xl font-semibold text-violet-900">Sell a design</h1>
         <p className="text-stone-600">It sells once. You keep the credit forever.</p>
         <label className="flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-stone-300 bg-white hover:border-violet-400">
           {preview ? (
@@ -86,7 +86,7 @@ export default function Upload() {
         </label>
       </div>
 
-      <div className="space-y-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+      <div className="space-y-5 rounded-3xl border border-[#ece3d9] bg-white/80 p-6 shadow-sm">
         <label className="block">
           <span className="text-sm font-medium">Title</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Midnight Waves"
@@ -127,7 +127,7 @@ export default function Upload() {
         {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
         <button disabled={!ready || busy}
-          className="w-full rounded-xl bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">
+          className="w-full rounded-full bg-violet-700 py-3 font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-40">
           {busy ? "Listing… (sign in your wallet, then Grok writes your description ✨)" : "Sign & List My Design"}
         </button>
       </div>

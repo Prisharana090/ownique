@@ -91,7 +91,7 @@ export default function BuyButton(props: { designId: string; title: string; pric
 
   if (!open)
     return (
-      <button onClick={() => setOpen(true)} className="w-full rounded-xl bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700">
+      <button onClick={() => setOpen(true)} className="w-full rounded-full bg-violet-700 py-3 font-semibold text-white hover:bg-violet-800">
         Buy &amp; Own It
       </button>
     );
@@ -123,7 +123,7 @@ export default function BuyButton(props: { designId: string; title: string; pric
       {status && !error && <p className="rounded-xl bg-violet-50 p-3 text-sm text-violet-800">{status}</p>}
       {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <button onClick={method === "bank" ? buyWithBank : buy} disabled={!checked.every(Boolean) || busy}
-        className="w-full rounded-xl bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-40">
+        className="w-full rounded-full bg-violet-700 py-3 font-semibold text-white hover:bg-violet-800 disabled:opacity-40">
         {!publicKey
           ? "Connect wallet to buy"
           : method === "bank"

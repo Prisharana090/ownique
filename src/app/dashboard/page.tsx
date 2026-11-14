@@ -13,7 +13,7 @@ type Stats = {
 };
 
 const COLORS: Record<string, string> = {
-  view: "#d4abc3", try_on: "#dfb872", purchase: "#652f52", upload: "#9a5a80", blocked_upload: "#c2410c", report: "#a8a29e",
+  view: "#c9b6e2", try_on: "#e9b2c6", purchase: "#5b3f7c", upload: "#a5527a", blocked_upload: "#c2410c", report: "#a8a29e",
 };
 const LABELS: Record<string, string> = {
   view: "Views", try_on: "Try-ons", purchase: "Sales", upload: "Uploads", blocked_upload: "Copies blocked", report: "Reports",

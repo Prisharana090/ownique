@@ -26,14 +26,15 @@ export default async function Shop({ searchParams }: { searchParams: Promise<{ c
           <p className="text-stone-600">Every design here can only ever have one owner.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
-          <Link href="/shop" className={`rounded-full border px-4 py-1.5 transition ${!category ? "border-violet-700 bg-violet-700 text-white" : "border-[#e5d9cc] bg-white/70 hover:border-violet-400"}`}>
+          <Link href="/shop" aria-current={!category ? "page" : undefined} className={`rounded-full border px-4 py-1.5 transition ${!category ? "border-violet-700 bg-violet-700 text-white" : "border-violet-200 bg-violet-50 text-violet-800 hover:border-violet-400"}`}>
             All
           </Link>
           {CATEGORIES.map((c) => (
             <Link
               key={c}
               href={`/shop?category=${encodeURIComponent(c)}`}
-              className={`rounded-full border px-4 py-1.5 transition capitalize ${category === c ? "border-violet-700 bg-violet-700 text-white" : "border-[#e5d9cc] bg-white/70 hover:border-violet-400"}`}
+              aria-current={category === c ? "page" : undefined}
+              className={`rounded-full border px-4 py-1.5 transition capitalize ${category === c ? "border-violet-700 bg-violet-700 text-white" : "border-violet-200 bg-violet-50 text-violet-800 hover:border-violet-400"}`}
             >
               {c}
             </Link>
@@ -50,9 +51,9 @@ export default async function Shop({ searchParams }: { searchParams: Promise<{ c
           No designs yet. <Link href="/upload" className="font-semibold text-violet-700">Be the first to sell one →</Link>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="columns-2 gap-4 sm:gap-5 md:columns-3 lg:columns-4">
           {designs.map((d) => (
-            <DesignCard key={d._id} d={d} />
+            <DesignCard key={d._id} d={d} masonry />
           ))}
         </div>
       )}

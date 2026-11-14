@@ -327,14 +327,14 @@ export default function TryOn() {
               {area.length > 0 && (
                 <svg viewBox={`0 0 ${nw} ${nh}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden rounded-2xl">
                   {areaMode === "draw" && area.length < 3
-                    ? <polyline points={area.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#c9952e" strokeWidth={Math.max(1.5, nw / 300)} />
-                    : <polygon points={area.map((p) => `${p.x},${p.y}`).join(" ")} fill={areaMode === "off" ? "none" : "rgba(223,184,114,0.18)"}
-                        stroke="#c9952e" strokeWidth={Math.max(1.5, nw / 300)} strokeDasharray={areaMode === "off" ? `${nw / 60} ${nw / 90}` : undefined} />}
+                    ? <polyline points={area.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#c46c8d" strokeWidth={Math.max(1.5, nw / 300)} />
+                    : <polygon points={area.map((p) => `${p.x},${p.y}`).join(" ")} fill={areaMode === "off" ? "none" : "rgba(196,108,141,0.15)"}
+                        stroke="#c46c8d" strokeWidth={Math.max(1.5, nw / 300)} strokeDasharray={areaMode === "off" ? `${nw / 60} ${nw / 90}` : undefined} />}
                 </svg>
               )}
               {areaMode !== "off" && area.map((p, i) => (
                 <span key={`v${i}`} onPointerDown={areaMode === "edit" ? beginVertex(i) : undefined} aria-label={`Print area point ${i + 1}`}
-                  className={`${handle} h-4 w-4 border-[#c9952e] bg-[#dfb872] ${areaMode === "edit" ? "cursor-move" : "pointer-events-none"}`} style={pct(p)} />
+                  className={`${handle} h-4 w-4 border-[#c46c8d] bg-[#e9b2c6] ${areaMode === "edit" ? "cursor-move" : "pointer-events-none"}`} style={pct(p)} />
               ))}
             </div>
           )}
@@ -345,7 +345,7 @@ export default function TryOn() {
               <p className="text-xs text-stone-500">
                 {areaMode === "draw"
                   ? `Tap around the edge of the surface to print on (for a hoodie: just the front panel). ${area.length} point${area.length === 1 ? "" : "s"} so far.`
-                  : areaMode === "edit" ? "Drag the gold points to adjust the outline."
+                  : areaMode === "edit" ? "Drag the pink points to adjust the outline."
                   : "Outline the part of the product the design may appear on, so it never spills onto the background, hands or hood."}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -397,7 +397,7 @@ export default function TryOn() {
         </div>
       </section>
 
-      {result && <Compare r={result} title="Product Mockup" label={LABEL} download selected={selected} />}
+      {result && <Compare r={result} title="Product Mockup" kind="manual" label={LABEL} download selected={selected} />}
 
       <section className="space-y-3 rounded-3xl border border-violet-200 bg-violet-50/50 p-5">
         <h2 className={step}>Optional: AI-Enhanced Preview</h2>
@@ -414,13 +414,13 @@ export default function TryOn() {
         {aiError && !aiBusy && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{aiError}</p>}
       </section>
 
-      {aiResult && <Compare r={aiResult} title="AI Try-On" label={AI_LABEL} selected={selected} />}
+      {aiResult && <Compare r={aiResult} title="AI Try-On" kind="ai" label={AI_LABEL} selected={selected} />}
     </div>
   );
 }
 
-function Compare({ r, title, label, download, selected }: {
-  r: { url: string; original: string; designId: string; thumb?: string }; title: string; label: string; download?: boolean; selected?: D;
+function Compare({ r, title, kind, label, download, selected }: {
+  r: { url: string; original: string; designId: string; thumb?: string }; title: string; kind: "manual" | "ai"; label: string; download?: boolean; selected?: D;
 }) {
   return (
     <section className="space-y-3">
@@ -431,7 +431,12 @@ function Compare({ r, title, label, download, selected }: {
           <img src={r.original} alt="Your original product photo" className="w-full rounded-2xl border border-stone-200 bg-white object-contain" />
         </figure>
         <figure className="space-y-2">
-          <figcaption className="text-sm font-semibold text-violet-800">{title}</figcaption>
+          <figcaption className="flex items-center gap-2 text-sm font-semibold text-violet-800">
+            {title}
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${kind === "ai" ? "bg-fuchsia-100 text-fuchsia-800" : "bg-violet-100 text-violet-800"}`}>
+              {kind === "ai" ? "✨ AI-generated" : "Manual mockup · no AI"}
+            </span>
+          </figcaption>
           <div className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={r.url} alt={title} className="w-full rounded-2xl border border-violet-200 bg-white object-contain" />

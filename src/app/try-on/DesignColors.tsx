@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_COLORS, cornerColor, isHex, palette, rgbToHex, type ColorSettings } from "@/lib/artColor";
 
-const PRESETS = ["#000000", "#ffffff", "#7c3aed", "#652f52", "#dfb872", "#e11d48", "#f97316", "#16a34a", "#0ea5e9", "#1e3a8a"];
+const PRESETS = ["#000000", "#ffffff", "#7c3aed", "#652f52", "#e9b2c6", "#e11d48", "#f97316", "#16a34a", "#0ea5e9", "#1e3a8a"];
 
 function Swatch({ color, active, onClick, label }: { color: string; active?: boolean; onClick: () => void; label?: string }) {
   return (

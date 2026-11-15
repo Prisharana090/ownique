@@ -8,7 +8,7 @@ const BASE = () => (process.env.NESSIE_BASE_URL || "http://api.nessieisreal.com"
 export const hasNessie = () => Boolean(process.env.NESSIE_API_KEY);
 
 /** Demo exchange rate so SOL prices can be paid in dollars. */
-export const solToUsd = (sol: number) => Math.round(sol * Number(process.env.SOL_USD_RATE || 150) * 100) / 100;
+export { solToUsd } from "@/lib/price";
 
 async function nessie<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BASE()}${path}${path.includes("?") ? "&" : "?"}key=${process.env.NESSIE_API_KEY}`;

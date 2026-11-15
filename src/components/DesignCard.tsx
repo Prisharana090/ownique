@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { short } from "@/lib/short";
+import { usd } from "@/lib/price";
 
 export type DesignSummary = {
   _id: string;
@@ -20,7 +21,7 @@ export default function DesignCard({ d, masonry = false }: { d: DesignSummary; m
   return (
     <Link
       href={`/design/${d._id}`}
-      aria-label={`${d.title}, ${sold ? "sold" : `${d.price} SOL`}, designed by ${short(d.designerWallet)}`}
+      aria-label={`${d.title}, ${sold ? "sold" : `${usd(d.price)}`}, designed by ${short(d.designerWallet)}`}
       className={`group block overflow-hidden rounded-3xl border border-[#ece3d9] bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-violet-200/50 ${masonry ? "mb-4 break-inside-avoid sm:mb-5" : ""}`}
     >
       <div className={`relative overflow-hidden bg-blush ${masonry ? "min-h-32" : "aspect-square"}`}>
@@ -47,7 +48,7 @@ export default function DesignCard({ d, masonry = false }: { d: DesignSummary; m
           <p className="truncate text-xs text-stone-600">Designed by {short(d.designerWallet)}</p>
         </div>
         <p className={`w-fit shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${sold ? "bg-stone-100 text-stone-600" : "bg-fuchsia-50 text-fuchsia-700"}`}>
-          {sold ? "Sold" : `${d.price} SOL`}
+          {sold ? "Sold" : usd(d.price)}
         </p>
       </div>
     </Link>

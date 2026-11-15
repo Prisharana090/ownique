@@ -2,6 +2,7 @@
 // (the accepted snapshot, never the current terms).
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { AGREEMENT_TITLE, DEMO_ACCEPTANCE_LABEL, GOVERNING_LAW_MISSING, LEGAL_REVIEW_NOTICE } from "./purchaseTerms";
+import { solText, usd } from "@/lib/price";
 
 export type PdfParty = { legalName: string; username: string | null; account: string; userId: string; acceptedAt: Date; acceptedVersion: string };
 export type PdfInput = {
@@ -128,7 +129,7 @@ export async function buildAgreementPdf(a: PdfInput): Promise<Buffer> {
   }
   row("Title", a.design.title);
   row("Design ID", a.design.id);
-  row("Price", `${a.design.priceSol} SOL`);
+  row("Price", `US${usd(a.design.priceSol)} (paid as ${solText(a.design.priceSol)})`);
   row("Original creator", a.design.creator);
   row("Third-party content", a.thirdParty.disclosed ? `Disclosed: ${a.thirdParty.details} (rights review: ${a.thirdParty.review})` : "None disclosed by the Designer");
 

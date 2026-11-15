@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   if (!file.type.startsWith("image/")) return NextResponse.json({ error: "File must be an image." }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image must be under 2MB." }, { status: 400 });
   if (!title) return NextResponse.json({ error: "Please add a title." }, { status: 400 });
-  if (!(price > 0)) return NextResponse.json({ error: "Price must be more than 0 SOL." }, { status: 400 });
+  if (!(price > 0)) return NextResponse.json({ error: "Price must be more than $0." }, { status: 400 });
   if (!CATEGORIES.includes(category as (typeof CATEGORIES)[number]))
     return NextResponse.json({ error: "Unknown category." }, { status: 400 });
   if (!designerWallet) return NextResponse.json({ error: "Connect your wallet first." }, { status: 401 });

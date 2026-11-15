@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { solText, usd } from "@/lib/price";
 
 type Terms = {
   version: string; termsHash: string; sections: { heading: string; body: string[] }[]; isDemo: boolean;
@@ -190,7 +191,7 @@ export default function BuyButton(props: { designId: string; title: string; pric
           ? "Connect wallet to buy"
           : method === "bank"
             ? `Pay $${bank?.priceUsd ?? "…"} by bank & Own It`
-            : `Pay ${props.price} SOL & Own It`}
+            : `Pay ${usd(props.price)} (${solText(props.price)}) & Own It`}
       </button>
       {terms && (
         <p className="text-[11px] leading-snug text-stone-500">{terms.legalNotice}</p>

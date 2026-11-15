@@ -5,6 +5,7 @@ import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import PrintButton from "@/components/PrintButton";
 import { getOwnershipGate } from "@/lib/agreements";
+import { solText, usd } from "@/lib/price";
 
 export const dynamic = "force-dynamic";
 
@@ -58,8 +59,8 @@ export default async function Certificate({ params }: { params: Promise<{ id: st
       d.paymentMethod === "bank"
         ? `Bank transfer via Capital One${d.priceUsd ? `, $${d.priceUsd}` : ""}`
         : d.txSignature
-          ? <a key="p" className="break-all text-violet-700 underline" target="_blank" href={explorer("tx", d.txSignature)}>{d.price} SOL · view on Solana</a>
-          : `${d.price} SOL`,
+          ? <a key="p" className="break-all text-violet-700 underline" target="_blank" href={explorer("tx", d.txSignature)}>{usd(d.price)} ({solText(d.price)}) · view on Solana</a>
+          : `${usd(d.price)} (${solText(d.price)})`,
     ]);
     if (d.tokenTransferSignature)
       rows.push(["Ownership transfer", <a key="tt" className="break-all text-violet-700 underline" target="_blank" href={explorer("tx", d.tokenTransferSignature)}>View on Solana</a>]);

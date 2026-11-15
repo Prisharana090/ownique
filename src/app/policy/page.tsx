@@ -87,7 +87,7 @@ const privacy: Section[] = [
       "Reviews you leave after a verified purchase, shown with your username and date.",
       "Your legal name when you sign an ownership transfer declaration. It's stored privately with that agreement and never shown publicly.",
       "Try It On mockups are made in your browser, so your photo stays on your device. Only if you click Generate AI Try-On are your photo, the design's watermarked preview and your mockup sent to an AI image service (Google Gemini or Cloudflare Workers AI, depending on how the site is set up) to create the image. Ownique doesn't save them.",
-      "Messages to Ask Ownique are sent to Grok (xAI) to get an answer and are not saved by Ownique.",
+      "Messages to Ask Ownique are sent to Google Gemini (or Grok by xAI, if set up) to get an answer and are not saved by Ownique.",
       "Anything recorded on Solana, like ownership and payments, is public and permanent by design.",
     ],
   },

@@ -10,6 +10,7 @@ import Link from "next/link";
 import ConfirmOwnership from "@/components/ConfirmOwnership";
 import { getOwnershipGate } from "@/lib/agreements";
 import { logEvent } from "@/lib/events";
+import { solText, usd } from "@/lib/price";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +84,7 @@ export default async function DesignPage({
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="font-serif text-4xl text-violet-900">{d.price} <span className="text-2xl text-fuchsia-500">SOL</span></p>
+            <p className="font-serif text-4xl text-violet-900">{usd(d.price)} <span className="text-base text-stone-500">USD · paid as {solText(d.price)} on devnet</span></p>
             <div id="buy" className="scroll-mt-24">
               {!gate.accepted ? (
                 <ConfirmOwnership designId={d._id} designerWallet={d.designerWallet} needsReaccept={gate.needsReaccept} />

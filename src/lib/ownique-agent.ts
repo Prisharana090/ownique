@@ -5,12 +5,14 @@
 import "server-only";
 import { createDeepAgent } from "deepagents";
 import { ChatXAI } from "@langchain/xai";
+import { ChatOpenAI } from "@langchain/openai";
 import { tool } from "langchain";
 import { z } from "zod";
 import { isValidObjectId } from "mongoose";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { getStats, hasTiger } from "@/lib/events";
+import { usd, usdToSol } from "@/lib/price";
 
 const SITE = () => process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -28,7 +30,7 @@ const searchDesigns = tool(
     await connectDb();
     const filter: Record<string, unknown> = { status: includeSold ? { $ne: "hidden" } : "listed" };
     if (category) filter.category = category;
-    if (maxPrice) filter.price = { $lte: maxPrice };
+    if (maxPrice) filter.price = { $lte: usdToSol(maxPrice) };
     if (query) {
       const rx = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$or = [{ title: rx }, { description: rx }, { tags: rx }];
@@ -36,7 +38,7 @@ const searchDesigns = tool(
     const docs = await Design.find(filter).sort({ createdAt: -1 }).limit(8).lean<DesignLean[]>();
     if (!docs.length) return "No designs matched.";
     return docs
-      .map((d) => `- "${d.title}" (${d.category}) · ${d.status === "sold" ? "SOLD" : `${d.price} SOL`} · ${SITE()}/design/${String(d._id)}`)
+      .map((d) => `- "${d.title}" (${d.category}) · ${d.status === "sold" ? "SOLD" : usd(d.price)} · ${SITE()}/design/${String(d._id)}`)
       .join("\n");
   },
   {
@@ -45,7 +47,7 @@ const searchDesigns = tool(
     schema: z.object({
       query: z.string().optional().describe("Keywords, e.g. 'waves' or 'minimalist'"),
       category: z.enum(["cup", "glasses", "shirt", "phone case", "tote", "other"]).optional(),
-      maxPrice: z.number().optional().describe("Maximum price in SOL"),
+      maxPrice: z.number().optional().describe("Maximum price in US dollars"),
       includeSold: z.boolean().optional().describe("Also include designs that already have an owner"),
     }),
   }
@@ -146,12 +148,20 @@ For simple questions, answer directly without planning or writing files.`;
 
 let agentCache: ReturnType<typeof createDeepAgent> | null = null;
 function getAgent() {
+  if (agentCache) return agentCache;
+  // Grok if XAI_API_KEY is set; otherwise Gemini's free tier through its OpenAI-compatible endpoint.
+  const model = process.env.XAI_API_KEY
+    ? new ChatXAI({ model: process.env.GROK_MODEL || "grok-4.7", apiKey: process.env.XAI_API_KEY, temperature: 0.3 })
+    : new ChatOpenAI({
+        model: process.env.GEMINI_CHAT_MODEL || "gemini-3.8-flash",
+        apiKey: process.env.GEMINI_API_KEY,
+        temperature: 0.3,
+        maxRetries: 1,
+        timeout: 25_000,
+        configuration: { baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" },
+      });
   agentCache ??= createDeepAgent({
-    model: new ChatXAI({
-      model: process.env.GROK_MODEL || "grok-4.7",
-      apiKey: process.env.XAI_API_KEY,
-      temperature: 0.3,
-    }),
+    model,
     tools: [searchDesigns, getDesign, ownershipRecord, lookupTerms, platformStats],
     systemPrompt: SYSTEM,
   });

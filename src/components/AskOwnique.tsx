@@ -20,7 +20,7 @@ export default function AskOwnique() {
   const [busy, setBusy] = useState(false);
   const end = useRef<HTMLDivElement>(null);
 
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [msgs, busy]);
+  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, busy]);
 
   function attach(file: File | null) {
     if (!file) return;
@@ -69,18 +69,18 @@ export default function AskOwnique() {
         <div className="fixed bottom-20 right-5 z-40 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
           <div className="bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-3 text-white">
             <p className="font-semibold">Ask Ownique</p>
-            <p className="text-xs text-violet-100">Powered by Grok · not legal advice</p>
+            <p className="text-xs text-violet-100">AI helper · not legal advice</p>
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
             {msgs.map((m, i) => (
               <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 ${m.role === "user" ? "bg-violet-600 text-white" : "bg-stone-100 text-stone-800"}`}>
+                <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 ${m.role === "user" ? "bg-violet-600 text-white" : "bg-stone-100 text-stone-800"}`}>
                   {m.image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={m.image} alt="Attached design" className="mb-2 max-h-32 rounded-lg" />
                   )}
-                  {m.content}
+                  {m.role === "assistant" ? rich(m.content) : m.content}
                 </div>
               </div>
             ))}
@@ -121,4 +121,30 @@ export default function AskOwnique() {
       )}
     </>
   );
+}
+
+/** Safe mini-formatter for replies: **bold**, [text](url) and bare links become real elements (no HTML injection). */
+function rich(raw: string) {
+  // Tidy common markdown: bullets → •, bold around links dropped, headings' #'s removed.
+  const text = raw
+    .replace(/^\s*[*-]\s+/gm, "• ")
+    .replace(/\*\*(\[[^\]]+\]\([^)]+\))\*\*/g, "$1")
+    .replace(/^#+\s*/gm, "");
+  const out: React.ReactNode[] = [];
+  const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)/g;
+  let last = 0, k = 0, m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[1]) out.push(<b key={k++}>{m[1]}</b>);
+    else {
+      const url = m[3] ?? m[4];
+      let href = url;
+      try { const u = new URL(url); if (u.origin === window.location.origin) href = u.pathname + u.search; } catch { /* keep */ }
+      const internal = href.startsWith("/");
+      out.push(<a key={k++} href={href} target={internal ? undefined : "_blank"} rel={internal ? undefined : "noopener noreferrer"} className="break-words font-medium text-violet-700 underline">{m[2] ?? (internal ? "View design" : url)}</a>);
+    }
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
 }

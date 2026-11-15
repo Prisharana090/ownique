@@ -2,6 +2,7 @@
 // Live dashboard powered by Tiger Data (refreshes every 5 seconds).
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { usd } from "@/lib/price";
 
 type Row = { bucket: string; event_type: string; events: number; sol: number };
 type Stats = {
@@ -71,7 +72,7 @@ export default function Dashboard() {
   const chart = [...byMinute.values()];
 
   const tiles = [
-    { label: "SOL earned by designers", value: sol.toFixed(2) },
+    { label: "Earned by designers", value: usd(sol) },
     { label: "Designs sold", value: total("purchase")?.events ?? 0 },
     { label: "Copies blocked", value: total("blocked_upload")?.events ?? 0 },
     { label: "Try-ons", value: total("try_on")?.events ?? 0 },

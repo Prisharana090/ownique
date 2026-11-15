@@ -5,7 +5,7 @@ import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { User } from "@/models/User";
 import { short } from "@/lib/short";
-import { solToUsd } from "@/lib/nessie";
+import { solText, usd } from "@/lib/price";
 import { getOwnershipGate } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
@@ -81,8 +81,8 @@ export default async function OwnershipTermsPreview({ params }: { params: Promis
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-stone-400">Purchase price</dt>
             <dd className="text-base text-stone-800">
-              <span className="font-serif text-2xl text-violet-900">{d.price} SOL</span>
-              <span className="ml-2 text-stone-500">or ${solToUsd(d.price)} by bank</span>
+              <span className="font-serif text-2xl text-violet-900">{usd(d.price)}</span>
+              <span className="ml-2 text-stone-500">paid as {solText(d.price)} or by bank</span>
             </dd>
           </div>
           <div className="sm:col-span-2">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import bs58 from "bs58";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { solText, usd } from "@/lib/price";
 
 type Party = { account: string; username: string | null; legalName?: string; acceptedAt: string; acceptedVersion: string };
 type Agreement = {
@@ -63,7 +64,7 @@ function Card({ a, role, token }: { a: Agreement; role: "buyer" | "designer"; to
         <p className="text-sm text-stone-700">
           <span className="font-medium">Payment:</span>{" "}
           {a.payment.status === "verified"
-            ? `Verified · ${a.payment.method === "bank" ? `US$${a.payment.amountUsd} by bank` : `${a.payment.amountSol} SOL`} · ${fmt(a.payment.verifiedAt)}`
+            ? `Verified · ${a.payment.method === "bank" ? `US$${a.payment.amountUsd} by bank` : `${usd(a.payment.amountSol ?? 0)} (${solText(a.payment.amountSol ?? 0)})`} · ${fmt(a.payment.verifiedAt)}`
             : "Not paid yet"}
         </p>
         {a.payment.reference && <p className="break-all text-xs text-stone-400">Reference: {a.payment.reference}</p>}

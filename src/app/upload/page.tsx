@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
 import DeclarationFields, { declarationComplete, emptyDeclaration, signDeclaration, type DeclarationState } from "@/components/DeclarationFields";
 import { declarationPrefix } from "@/lib/declaration";
+import { usdToSol } from "@/lib/price";
 
 const CATEGORIES = ["cup", "glasses", "shirt", "phone case", "tote", "other"];
 
@@ -54,7 +55,7 @@ export default function Upload() {
     const form = new FormData();
     form.append("image", file);
     form.append("title", title);
-    form.append("price", price);
+    form.append("price", String(usdToSol(Number(price)))); // stored in SOL for the Solana payment
     form.append("category", category);
     form.append("designerWallet", publicKey.toBase58());
     form.append("agreed", String(allChecked));
@@ -95,8 +96,8 @@ export default function Upload() {
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-sm font-medium">Price (SOL)</span>
-            <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.5"
+            <span className="text-sm font-medium">Price (US$)</span>
+            <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="75"
               className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 outline-violet-500" />
           </label>
           <label className="block">

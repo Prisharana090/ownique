@@ -7,6 +7,7 @@ import { User } from "@/models/User";
 import DesignCard, { type DesignSummary } from "@/components/DesignCard";
 import { short } from "@/lib/short";
 import { withOwnershipStatus } from "@/lib/agreements";
+import { usd } from "@/lib/price";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export default async function Profile({ params }: { params: Promise<{ wallet: st
           </div>
         </div>
         <dl className="mt-6 grid grid-cols-3 gap-3 text-center">
-          {[["Designs", createdList.length], ["Sold", sales.length], ["SOL earned", earned.toFixed(2)]].map(([label, value]) => (
+          {[["Designs", createdList.length], ["Sold", sales.length], ["Earned", usd(earned)]].map(([label, value]) => (
             <div key={String(label)} className="rounded-2xl bg-violet-50 px-3 py-3">
               <dt className="text-xs text-stone-600">{label}</dt>
               <dd className="font-serif text-2xl font-semibold text-violet-900">{value}</dd>

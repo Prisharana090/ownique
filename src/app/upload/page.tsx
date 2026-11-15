@@ -7,7 +7,7 @@ import bs58 from "bs58";
 import DeclarationFields, { declarationComplete, emptyDeclaration, signDeclaration, type DeclarationState } from "@/components/DeclarationFields";
 import ListingFields, { emptyListing, listingValid, type ListingState } from "@/components/ListingFields";
 import { declarationPrefix } from "@/lib/declaration";
-import { fetchMe } from "@/lib/meClient";
+import { fetchMe, type Me } from "@/lib/meClient";
 
 const CONFIRMATIONS = [
   "It doesn't use any brand logo, trademark, mascot or character.",
@@ -50,13 +50,31 @@ export default function Upload() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Done[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
+  const [me, setMe] = useState<Me>(null);
+  const [meLoaded, setMeLoaded] = useState(false);
+  const username = me?.username ?? null;
 
-  useEffect(() => { fetchMe().then((a) => setUsername(a?.username ?? null)).catch(() => {}); }, []);
+  useEffect(() => { fetchMe(true).then(setMe).catch(() => {}).finally(() => setMeLoaded(true)); }, []);
 
   const busy = stage !== "idle";
   const allChecked = checked.every(Boolean);
-  const ready = Boolean(publicKey && file && listingValid(listing) && allChecked && declarationComplete(declaration));
+  const walletLinked = Boolean(publicKey && me?.walletAddress === publicKey.toBase58());
+  // Everything the server will check, listed in plain words so the button never looks "stuck".
+  const missing = [
+    meLoaded && !me && "Log in with a Designer account",
+    me && me.role !== "designer" && "Use a Designer account (this one is a Buyer)",
+    !publicKey && "Connect your wallet (Select Wallet, top right)",
+    publicKey && me?.role === "designer" && !walletLinked && "Link this wallet on your profile (it's different from the one on your account)",
+    !file && "Choose your artwork",
+    !listing.title.trim() && "Add a title",
+    !(Number(listing.price) > 0) && "Set a price",
+    !allChecked && "Tick all 3 seller agreement boxes",
+    declaration.legalName.trim().split(/\s+/).length < 2 && "Enter your full legal name (first and last)",
+    !(declaration.reviewedDeclaration && declaration.acceptedDeclaration && declaration.authorityConfirmed) && "Tick all the ownership declaration boxes",
+    declaration.thirdPartyContent === null && "Answer the third-party content question",
+    declaration.thirdPartyContent === true && declaration.thirdPartyDetails.trim().length < 5 && "Describe the third-party content",
+  ].filter(Boolean) as string[];
+  const ready = Boolean(publicKey && file && walletLinked && me?.role === "designer" && listingValid(listing) && allChecked && declarationComplete(declaration));
   const last = done[done.length - 1];
 
   function pickFile(f: File | null) {
@@ -190,9 +208,21 @@ export default function Upload() {
 
         <DeclarationFields value={declaration} onChange={setDeclaration} disabled={busy} />
 
-        {!publicKey && <p className="text-sm text-amber-700">Connect your wallet (top right) to publish.</p>}
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
+        {!busy && missing.length > 0 && (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3 text-sm text-violet-900">
+            <p className="font-semibold">Still needed to publish:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {missing.map((m) => (
+                <li key={m}>
+                  {m.startsWith("Link this wallet") && username ? <Link href={`/u/${username}`} className="underline">{m}</Link>
+                    : m.startsWith("Log in") ? <Link href="/login" className="underline">{m}</Link> : m}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {busy && (
           <div aria-live="polite" className="space-y-1.5">
             <div className="h-2 overflow-hidden rounded-full bg-violet-100">

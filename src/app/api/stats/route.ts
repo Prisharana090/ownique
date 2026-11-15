@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStats, hasTiger } from "@/lib/events";
+import { getStatsCached, hasTiger } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!hasTiger()) return NextResponse.json({ configured: false });
   try {
-    return NextResponse.json({ configured: true, ...(await getStats()) });
+    return NextResponse.json({ configured: true, ...(await getStatsCached()) });
   } catch (err) {
     console.error("Tiger Data error:", err);
     const detail = process.env.NODE_ENV === "development" ? ` (${(err as Error).message})` : "";

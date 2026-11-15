@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { clearMe, fetchMe } from "@/lib/meClient";
 
 type Me = { username: string; displayName: string; role: "buyer" | "designer"; hasAvatar: boolean } | null;
 
@@ -10,7 +11,7 @@ export default function AccountMenu() {
   const [me, setMe] = useState<Me | undefined>(undefined);
   const pathname = usePathname();
   const router = useRouter();
-  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((d) => setMe(d.account)).catch(() => setMe(null)); }, [pathname]);
+  useEffect(() => { fetchMe().then(setMe); }, [pathname]);
   if (me === undefined) return <span className="h-9 w-24" aria-hidden />;
   if (!me)
     return (
@@ -28,7 +29,7 @@ export default function AccountMenu() {
           : <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-200 font-serif text-violet-900">{me.displayName.slice(0, 1).toUpperCase()}</span>}
         @{me.username}
       </Link>
-      <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); setMe(null); router.refresh(); }}
+      <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); clearMe(); setMe(null); router.refresh(); }}
         className="rounded-full px-3 py-2 text-sm text-stone-600 hover:bg-stone-100">Log out</button>
     </span>
   );

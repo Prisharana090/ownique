@@ -3,23 +3,42 @@ import { createHash, randomBytes } from "crypto";
 import { connectDb, hasDb } from "@/lib/db";
 import { Account } from "@/models/Account";
 import { throttled } from "@/lib/auth";
+import { hasEmail, resetEmail, sendEmail, siteUrl } from "@/lib/email";
+
+const SAME = { ok: true, message: "If that email has an account, we've sent a reset link. It's valid for one hour." };
 
 /**
- * POST { email } → creates a one-hour reset link. The response is the same whether or not the email exists.
- * No email service is configured yet, so in development the link is printed in the server terminal only.
+ * POST { email } → emails a one-hour, single-use reset link. The response is identical whether or not
+ * the email is registered (no account discovery). Rate-limited per email and per IP.
  */
 export async function POST(req: Request) {
   if (!hasDb()) return NextResponse.json({ error: "No database configured." }, { status: 503 });
-  const email = String((await req.json().catch(() => ({}))).email ?? "").trim().toLowerCase();
-  if (throttled(`reset:${email}`, 3, 60 * 60 * 1000)) return NextResponse.json({ ok: true });
+  const email = String((await req.json().catch(() => ({}))).email ?? "").trim().toLowerCase().slice(0, 200);
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "local";
+  if (throttled(`reset-ip:${ip}`, 10, 3600_000) || throttled(`reset:${email}`, 3, 3600_000)) return NextResponse.json(SAME);
+
   await connectDb();
-  const a = await Account.findOne({ email }).select("_id");
-  if (a) {
-    const token = randomBytes(32).toString("base64url");
-    await Account.updateOne({ _id: a._id }, { resetTokenHash: createHash("sha256").update(token).digest("hex"), resetExpires: new Date(Date.now() + 3600_000) });
-    const link = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/reset?token=${token}`;
-    if (process.env.NODE_ENV === "development") console.info(`[Ownique] Password reset link for ${email}: ${link}`);
-    // TODO: send `link` by email once an email provider is configured.
+  const a = await Account.findOne({ email }).select("_id email");
+  if (!a) return NextResponse.json(SAME);
+
+  const base = siteUrl();
+  if (!base) {
+    console.error("[Ownique] Password reset not sent: NEXT_PUBLIC_SITE_URL is not set.");
+    return NextResponse.json(SAME);
   }
-  return NextResponse.json({ ok: true });
+  const token = randomBytes(32).toString("base64url"); // only its hash is stored
+  await Account.updateOne({ _id: a._id }, { resetTokenHash: createHash("sha256").update(token).digest("hex"), resetExpires: new Date(Date.now() + 3600_000) });
+  const link = `${base}/reset?token=${token}`;
+
+  if (hasEmail()) {
+    const m = resetEmail(link);
+    const sent = await sendEmail(a.email, m.subject, m.html, m.text);
+    if (!sent.ok) console.error("[Ownique] Password reset email failed:", sent.error); // never logs the link
+  } else if (process.env.NODE_ENV === "development") {
+    // Local development without an email service only: print the link so the flow can be tested.
+    console.info(`[Ownique] (dev only, email not configured) Password reset link: ${link}`);
+  } else {
+    console.error("[Ownique] Password reset not sent: email service not configured.");
+  }
+  return NextResponse.json(SAME);
 }

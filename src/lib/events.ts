@@ -17,7 +17,12 @@ function pool() {
     connectionString: url.toString(),
     ssl: { rejectUnauthorized: false },
     max: 5,
+    connectionTimeoutMillis: 5_000, // don't let a slow network hang requests
+    idleTimeoutMillis: 30_000,
+    query_timeout: 8_000,
+    statement_timeout: 8_000,
   });
+  g._tigerPool.on("error", (err) => console.error("Tiger Data pool error:", err.message));
   return g._tigerPool;
 }
 
@@ -65,6 +70,17 @@ export function logEvent(type: EventType, data: { designId?: string; wallet?: st
       ])
     )
     .catch((err) => console.error("Tiger Data log failed:", err.message));
+}
+
+// Every open dashboard polls this; share one query result for a few seconds instead of hitting the DB per tab.
+const statsCache = globalThis as unknown as { _stats?: { at: number; p: Promise<unknown> } };
+export function getStatsCached(maxAgeMs = 4_000) {
+  const c = statsCache._stats;
+  if (c && Date.now() - c.at < maxAgeMs) return c.p as ReturnType<typeof getStats>;
+  const p = getStats();
+  statsCache._stats = { at: Date.now(), p };
+  p.catch(() => { if (statsCache._stats?.p === p) statsCache._stats = undefined; });
+  return p;
 }
 
 /** Per-minute counts for the last hour + all-time totals, for the dashboard. */

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { clearMe } from "@/lib/meClient";
 
 export default function Login() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function Login() {
     const res = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) { setError(d.error || "Couldn't log in."); setBusy(false); return; }
+    clearMe();
     router.push(`/u/${d.username}`);
     router.refresh();
   }

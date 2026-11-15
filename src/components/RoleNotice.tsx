@@ -2,10 +2,11 @@
 // Tells people up front if their account can't do this (the server enforces it either way).
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { fetchMe } from "@/lib/meClient";
 
 export default function RoleNotice({ need, action }: { need: "buyer" | "designer"; action: string }) {
   const [me, setMe] = useState<{ role: string; username: string; walletAddress: string | null } | null | undefined>(undefined);
-  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((d) => setMe(d.account)).catch(() => setMe(null)); }, []);
+  useEffect(() => { fetchMe().then(setMe); }, []);
   if (me === undefined) return null;
   const box = "rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-4 text-sm text-fuchsia-900";
   if (!me) return <p className={box}>Please <Link href="/login" className="font-semibold underline">log in</Link> or <Link href="/signup" className="font-semibold underline">create a {need === "designer" ? "Designer" : "Buyer"} account</Link> to {action}.</p>;

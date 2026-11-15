@@ -2,6 +2,7 @@
 // Ratings & Feedback for a designer: real verified-purchase reviews only.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { fetchMe } from "@/lib/meClient";
 
 type Sum = { average: number | null; count: number; dist: { star: number; count: number }[] };
 type Rev = { _id: string; designId: string; buyerUsername: string; rating: number; text: string; createdAt: string; updatedAt: string; mine: boolean };
@@ -20,7 +21,7 @@ export default function ReviewsPanel({ designerWallet, designerName }: { designe
 
   const load = useCallback(() => {
     fetch(`/api/reviews?designer=${encodeURIComponent(designerWallet)}`).then((r) => r.json()).then(setData).catch(() => {});
-    fetch("/api/auth/me").then((r) => r.json()).then((d) => setMe(d.account)).catch(() => setMe(null));
+    fetchMe().then(setMe);
   }, [designerWallet]);
   useEffect(load, [load]);
 

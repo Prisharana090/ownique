@@ -16,7 +16,7 @@ function Reset() {
     const d = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) return setMsg({ ok: false, text: d.error || "Something went wrong." });
-    setMsg({ ok: true, text: token ? "Your password was changed. You can log in now." : "If that email has an account, a reset link has been created. It's valid for one hour." });
+    setMsg({ ok: true, text: token ? "Your password was changed. You can log in now." : d.message || "If that email has an account, we've sent a reset link." });
   }
   const field = "mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5";
   return (

@@ -22,14 +22,34 @@ const LABELS: Record<string, string> = {
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
 
+  const [stale, setStale] = useState(false);
   useEffect(() => {
-    const load = () => fetch("/api/stats").then((r) => r.json()).then(setStats).catch(() => {});
-    load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    // Poll every 5s only while the tab is visible, never overlapping requests, with an 8s timeout.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let ctrl: AbortController | undefined;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped || document.visibilityState !== "visible") return;
+      ctrl = new AbortController();
+      const kill = setTimeout(() => ctrl?.abort(), 8000);
+      try {
+        const r = await fetch("/api/stats", { signal: ctrl.signal, cache: "no-store" });
+        setStats(await r.json());
+        setStale(false);
+      } catch {
+        setStale(true);
+      } finally {
+        clearTimeout(kill);
+        if (!stopped) timer = setTimeout(tick, 5000);
+      }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") { clearTimeout(timer); tick(); } };
+    tick();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { stopped = true; clearTimeout(timer); ctrl?.abort(); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
-  if (!stats) return <p className="text-stone-500">Loading live data…</p>;
+  if (!stats) return <p className="text-stone-500">{stale ? "Couldn't reach the live data. Retrying…" : "Loading live data…"}</p>;
   if (!stats.configured)
     return (
       <p className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-amber-900">

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { clearMe } from "@/lib/meClient";
 
 const ROLES = [
   { id: "buyer", title: "Buyer", text: "Discover designs, try them on and buy one-of-a-kind ownership. Review designers after a purchase." },
@@ -23,6 +24,7 @@ export default function SignUp() {
     const res = await fetch("/api/auth/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, role, acceptTerms: terms }) });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) { setError(d.error || "Couldn't create your account."); setBusy(false); return; }
+    clearMe();
     router.push(`/u/${d.username}`);
     router.refresh();
   }

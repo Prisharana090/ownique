@@ -11,6 +11,8 @@ function SaveUserOnConnect() {
   const { publicKey } = useWallet();
   useEffect(() => {
     if (!publicKey) return;
+    const key = `ownique-user-saved:${publicKey.toBase58()}`;
+    try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* storage blocked: just save */ }
     fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

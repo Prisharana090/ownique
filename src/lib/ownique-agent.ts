@@ -5,7 +5,7 @@
 import "server-only";
 import { createDeepAgent } from "deepagents";
 import { ChatXAI } from "@langchain/xai";
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { tool } from "langchain";
 import { z } from "zod";
 import { isValidObjectId } from "mongoose";
@@ -146,26 +146,45 @@ then 1-3 short sentences on what looks similar and how to make it more original.
 Style: short, warm, simple words, no legal jargon. You are not a lawyer and this is not a legal trademark search.
 For simple questions, answer directly without planning or writing files.`;
 
-let agentCache: ReturnType<typeof createDeepAgent> | null = null;
-function getAgent() {
-  if (agentCache) return agentCache;
-  // Grok if XAI_API_KEY is set; otherwise Gemini's free tier through its OpenAI-compatible endpoint.
+/**
+ * Gemini via LangChain, minus Deep Agents' built-in file "grep" tool: its optional fields use a JSON-schema
+ * form Gemini rejects, and a marketplace helper never needs to grep files.
+ */
+class GeminiChat extends ChatGoogleGenerativeAI {
+  override bindTools(...args: Parameters<ChatGoogleGenerativeAI["bindTools"]>) {
+    const [tools, kwargs] = args;
+    const keep = tools.filter((t) => (t as { name?: string }).name !== "grep");
+    return super.bindTools(keep, kwargs);
+  }
+}
+
+const agentCache = new Map<string, ReturnType<typeof createDeepAgent>>();
+
+/** Models the agent may use: Grok if XAI_API_KEY is set, otherwise Gemini free-tier models (each has its own quota). */
+export function agentModels(): string[] {
+  if (process.env.XAI_API_KEY) return [process.env.GROK_MODEL || "grok-4.7"];
+  return [...new Set([process.env.GEMINI_CHAT_MODEL, "gemini-3.8-flash", "gemini-flash-lite-latest"].filter(Boolean) as string[])];
+}
+
+function getAgent(modelName: string) {
+  const cached = agentCache.get(modelName);
+  if (cached) return cached;
+  // Gemini uses LangChain's official Google integration (it keeps Gemini 3's tool-call thought signatures).
   const model = process.env.XAI_API_KEY
-    ? new ChatXAI({ model: process.env.GROK_MODEL || "grok-4.7", apiKey: process.env.XAI_API_KEY, temperature: 0.3 })
-    : new ChatOpenAI({
-        model: process.env.GEMINI_CHAT_MODEL || "gemini-3.8-flash",
+    ? new ChatXAI({ model: modelName, apiKey: process.env.XAI_API_KEY, temperature: 0.3 })
+    : new GeminiChat({
+        model: modelName,
         apiKey: process.env.GEMINI_API_KEY,
         temperature: 0.3,
-        maxRetries: 0, // fail fast so the plain-Gemini fallback answers quickly when quota is out
-        timeout: 20_000,
-        configuration: { baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" },
+        maxRetries: 0, // fail fast and move to the next model when a free quota is out
       });
-  agentCache ??= createDeepAgent({
+  const agent = createDeepAgent({
     model,
     tools: [searchDesigns, getDesign, ownershipRecord, lookupTerms, platformStats],
     systemPrompt: SYSTEM,
   });
-  return agentCache;
+  agentCache.set(modelName, agent);
+  return agent;
 }
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -179,7 +198,7 @@ function textOf(content: unknown): string {
   return "";
 }
 
-export async function runOwniqueAgent(messages: ChatMessage[], imageDataUrl?: string | null) {
+export async function runOwniqueAgent(messages: ChatMessage[], imageDataUrl?: string | null, modelName = agentModels()[0]) {
   const history: { role: string; content: unknown }[] = messages
     .slice(-10)
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
@@ -193,7 +212,7 @@ export async function runOwniqueAgent(messages: ChatMessage[], imageDataUrl?: st
       ],
     });
   }
-  const result = await getAgent().invoke({ messages: history } as never, { recursionLimit: 25 });
+  const result = await getAgent(modelName).invoke({ messages: history } as never, { recursionLimit: 25 });
   const out = (result as { messages: { content: unknown; getType?: () => string }[] }).messages;
   for (let i = out.length - 1; i >= 0; i--) {
     const t = textOf(out[i].content).trim();

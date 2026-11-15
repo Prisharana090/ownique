@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { askOwnique, type ChatMessage } from "@/lib/assistant";
+import { askOwnique, lastVia, type ChatMessage } from "@/lib/assistant";
 
 export const maxDuration = 60;
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   try {
     const reply = await askOwnique(messages, image);
-    return NextResponse.json({ reply });
+    return NextResponse.json(process.env.NODE_ENV === "development" ? { reply, via: lastVia } : { reply });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ reply: "Sorry, something went wrong. Please try again." });

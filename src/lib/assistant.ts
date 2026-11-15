@@ -1,7 +1,7 @@
 // "Ask Ownique": an AI helper (Gemini free tier, or Grok if XAI_API_KEY is set) that answers questions about the marketplace
 // and checks uploaded images for look-alikes of famous brand logos and characters.
 import "server-only";
-import { runOwniqueAgent } from "@/lib/ownique-agent";
+import { agentModels, runOwniqueAgent } from "@/lib/ownique-agent";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { usd } from "@/lib/price";
@@ -24,6 +24,9 @@ Rules: keep replies short, warm and simple (no legal jargon). You are not a lawy
 trademark search, so for anything serious suggest checking official sources (e.g. the USPTO trademark search).
 If asked about something unrelated to Ownique or design, politely steer back.`;
 
+/** Which path answered the last question (shown only in local development). */
+export let lastVia = "";
+
 export async function askOwnique(messages: ChatMessage[], imageDataUrl?: string | null) {
   const key = process.env.XAI_API_KEY;
   if (!key) {
@@ -31,12 +34,19 @@ export async function askOwnique(messages: ChatMessage[], imageDataUrl?: string 
       return "I'm not switched on yet: add GEMINI_API_KEY (free) or XAI_API_KEY to .env.local and I'll be ready to help! 💜";
     // Free path: the LangChain Deep Agent (with Ownique tools) running on Gemini's free tier,
     // falling back to a direct Gemini call if the agent fails (e.g. Google is briefly busy).
-    try {
-      return await runOwniqueAgent(messages, imageDataUrl);
-    } catch (err) {
-      console.error("Deep Agent (Gemini) failed, falling back to plain Gemini:", (err as Error).message);
-      return askGemini(messages, imageDataUrl);
+    const agentErrors: string[] = [];
+    for (const model of agentModels()) {
+      try {
+        const reply = await runOwniqueAgent(messages, imageDataUrl, model);
+        lastVia = `langchain-agent:${model}`;
+        return reply;
+      } catch (err) {
+        agentErrors.push(`${model}: ${(err as Error).message.slice(0, 300)}`);
+        console.error(`Deep Agent (${model}) failed:`, (err as Error).message.slice(0, 200));
+      }
     }
+    lastVia = `gemini-direct (agent errors: ${agentErrors.join(" | ")})`;
+    return askGemini(messages, imageDataUrl);
   }
 
   // 🦜 Main path: the LangChain Deep Agent (with Ownique tools). Falls back to a plain Grok call if it fails.

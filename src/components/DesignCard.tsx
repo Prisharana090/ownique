@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { short } from "@/lib/short";
-import { usd } from "@/lib/price";
+import { priceLabel } from "@/lib/designOptions";
 
 export type DesignSummary = {
   _id: string;
@@ -13,6 +13,8 @@ export type DesignSummary = {
   ownershipConfirmed?: boolean;
   rightsReview?: string;
   imageHash?: string;
+  currency?: string;
+  isDemo?: boolean;
 };
 
 /** `masonry`: image keeps its natural shape (Pinterest-style columns). Default: square grid tile. */
@@ -21,7 +23,7 @@ export default function DesignCard({ d, masonry = false }: { d: DesignSummary; m
   return (
     <Link
       href={`/design/${d._id}`}
-      aria-label={`${d.title}, ${sold ? "sold" : `${usd(d.price)}`}, designed by ${short(d.designerWallet)}`}
+      aria-label={`${d.title}, ${sold ? "sold" : `available, ${priceLabel(d.price, d.currency)}`}${d.isDemo ? ", demo listing" : ""}, designed by ${short(d.designerWallet)}`}
       className={`group block overflow-hidden rounded-3xl border border-[#ece3d9] bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-violet-200/50 ${masonry ? "mb-4 break-inside-avoid sm:mb-5" : ""}`}
     >
       <div className={`relative overflow-hidden bg-blush ${masonry ? "min-h-32" : "aspect-square"}`}>
@@ -36,10 +38,11 @@ export default function DesignCard({ d, masonry = false }: { d: DesignSummary; m
             {d.ownershipConfirmed ? "⚖️ Rights review" : "🔒 Awaiting designer confirmation"}
           </span>
         )}
-        {sold && (
-          <span className="absolute right-3 top-3 rounded-full bg-violet-900 px-3 py-1 text-xs font-semibold text-white">
-            👑 Sold · Owned
-          </span>
+        <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ${sold ? "bg-violet-900 text-white" : "bg-white/95 text-emerald-700 backdrop-blur"}`}>
+          {sold ? "👑 Sold" : "Available"}
+        </span>
+        {d.isDemo && (
+          <span className="absolute left-3 top-11 rounded-full bg-amber-100/95 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">Demo data</span>
         )}
       </div>
       <div className="flex flex-col gap-1.5 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-4">
@@ -48,7 +51,7 @@ export default function DesignCard({ d, masonry = false }: { d: DesignSummary; m
           <p className="truncate text-xs text-stone-600">Designed by {short(d.designerWallet)}</p>
         </div>
         <p className={`w-fit shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${sold ? "bg-stone-100 text-stone-600" : "bg-fuchsia-50 text-fuchsia-700"}`}>
-          {sold ? "Sold" : usd(d.price)}
+          {sold ? "Sold" : priceLabel(d.price, d.currency)}
         </p>
       </div>
     </Link>

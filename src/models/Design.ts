@@ -1,12 +1,19 @@
-import { Schema, model, models } from "mongoose";
+import { Schema, deleteModel, model, models } from "mongoose";
 
-export const CATEGORIES = ["cup", "glasses", "shirt", "phone case", "tote", "other"] as const;
+export { PRODUCT_CATEGORIES as CATEGORIES } from "@/lib/designOptions";
+import { PRODUCT_CATEGORIES as CATEGORIES } from "@/lib/designOptions";
 
 const DesignSchema = new Schema(
   {
     title: { type: String, required: true },
     price: { type: Number, required: true }, // in SOL
-    category: { type: String, enum: CATEGORIES, default: "other" },
+    category: { type: String, enum: CATEGORIES, default: "other" }, // product the design is made for
+    currency: { type: String, enum: ["USD", "SOL"], default: "USD" }, // how the designer listed the price (stored price is SOL)
+    style: { type: String, default: "other" },
+    material: { type: String, default: "any" },
+    isDemo: { type: Boolean, default: false }, // test/demo listing, labeled on cards
+    // Watermarked public preview, made once at upload (the original above stays private).
+    previewData: { type: Buffer, select: false, default: null },
     // Image is stored in MongoDB for hackathon simplicity (max ~2MB).
     imageData: { type: Buffer, required: true, select: false },
     imageType: { type: String, required: true },
@@ -33,4 +40,5 @@ const DesignSchema = new Schema(
   { timestamps: true }
 );
 
-export const Design = models.Design || model("Design", DesignSchema);
+if (models.Design) deleteModel("Design"); // re-register on hot reload so new fields apply
+export const Design = model("Design", DesignSchema) as unknown as (typeof models)[string]; // loosely typed, as before

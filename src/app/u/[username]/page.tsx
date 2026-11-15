@@ -67,10 +67,20 @@ export default async function UserProfile({ params }: { params: Promise<{ userna
       {a.role === "designer" ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           <section className="space-y-4 rounded-3xl border border-[#ece3d9] bg-white/70 p-5">
-            <h2 className="font-serif text-2xl font-semibold text-violet-900">Original designs</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-serif text-2xl font-semibold text-violet-900">Original designs{designs.length ? <span className="ml-2 text-base font-normal text-stone-500">({designs.length})</span> : null}</h2>
+              {isOwner && <Link href="/upload" className="rounded-full bg-violet-700 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-800">+ Upload New Design</Link>}
+            </div>
             {!wallet ? <p className="text-sm text-stone-600">{isOwner ? "Link your wallet below to list and sell designs." : "No designs yet."}</p>
               : designs.length === 0 ? <p className="text-sm text-stone-600">No designs yet.{isOwner && <> <Link href="/upload" className="font-semibold text-violet-700 underline">List your first design →</Link></>}</p>
-              : <div className="columns-2 gap-4">{designs.map((d) => <DesignCard key={d._id} d={d} masonry />)}</div>}
+              : <div className="grid grid-cols-2 gap-4">{designs.map((d) => (
+                  <div key={d._id}>
+                    <DesignCard d={d} />
+                    {isOwner && d.status === "listed" && (
+                      <Link href={`/design/${d._id}/edit`} className="mt-1.5 inline-block text-xs font-semibold text-violet-700 hover:underline">✏️ Edit listing</Link>
+                    )}
+                  </div>
+                ))}</div>}
           </section>
           <ReviewsPanel designerWallet={wallet ?? ""} designerName={a.displayName} />
         </div>

@@ -1,116 +1,182 @@
 "use client";
 import RoleNotice from "@/components/RoleNotice";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
 import DeclarationFields, { declarationComplete, emptyDeclaration, signDeclaration, type DeclarationState } from "@/components/DeclarationFields";
+import ListingFields, { emptyListing, listingValid, type ListingState } from "@/components/ListingFields";
 import { declarationPrefix } from "@/lib/declaration";
-import { usdToSol } from "@/lib/price";
-
-const CATEGORIES = ["cup", "glasses", "shirt", "phone case", "tote", "other"];
+import { fetchMe } from "@/lib/meClient";
 
 const CONFIRMATIONS = [
   "It doesn't use any brand logo, trademark, mascot or character.",
   "I understand I'll be credited as the creator, but the buyer will own the design.",
   "I agree to the Ownership Policy.",
 ];
+const MAX_BYTES = 2 * 1024 * 1024;
+const TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+type Done = { id: string; title: string };
+
+/** Sends the form with real upload progress (fetch can't report it). */
+function postWithProgress(url: string, body: FormData, onProgress: (pct: number) => void) {
+  return new Promise<{ ok: boolean; data: { id?: string; error?: string } }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
+    xhr.onload = () => {
+      let data: { id?: string; error?: string } = {};
+      try { data = JSON.parse(xhr.responseText); } catch { data = { error: "The server sent an unexpected reply." }; }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, data });
+    };
+    xhr.onerror = () => reject(new Error("Network error. Check your connection and try again."));
+    xhr.ontimeout = () => reject(new Error("The upload took too long. Please try again."));
+    xhr.timeout = 120_000;
+    xhr.send(body);
+  });
+}
 
 export default function Upload() {
-  const router = useRouter();
   const { publicKey, signMessage } = useWallet();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("cup");
+  const [listing, setListing] = useState<ListingState>(emptyListing);
+  const [isDemo, setIsDemo] = useState(false);
   const [checked, setChecked] = useState<boolean[]>(CONFIRMATIONS.map(() => false));
   const [declaration, setDeclaration] = useState<DeclarationState>(emptyDeclaration);
-  const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<"idle" | "signing" | "uploading" | "processing">("idle");
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<Done[]>([]);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
 
+  useEffect(() => { fetchMe().then((a) => setUsername(a?.username ?? null)).catch(() => {}); }, []);
+
+  const busy = stage !== "idle";
   const allChecked = checked.every(Boolean);
-  const ready = Boolean(publicKey && file && title && Number(price) > 0 && allChecked && declarationComplete(declaration));
+  const ready = Boolean(publicKey && file && listingValid(listing) && allChecked && declarationComplete(declaration));
+  const last = done[done.length - 1];
 
   function pickFile(f: File | null) {
+    setError(null);
+    if (f && !TYPES.includes(f.type)) return setError("Artwork must be a PNG, JPG or WebP image.");
+    if (f && f.size > MAX_BYTES) return setError(`That image is ${(f.size / 1024 / 1024).toFixed(1)}MB. The limit is 2MB.`);
     setFile(f);
     setPreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  function startAnother() {
+    setFile(null);
+    setPreview(null);
+    setListing({ ...emptyListing, currency: listing.currency, style: listing.style, category: listing.category });
+    setChecked(CONFIRMATIONS.map(() => false));
+    setDeclaration(emptyDeclaration);
+    setProgress(0);
+    setError(null);
+    setShowSuccess(false); // the list of what was published this session is kept
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ready || !file || !publicKey) return;
     if (!signMessage) return setError("Your wallet can't sign messages. Try Phantom.");
-    setBusy(true);
     setError(null);
+    setStage("signing");
     // ✍️ Sign the ownership declaration with the wallet (free, no transaction)
     let signed: Record<string, string>;
     try {
       signed = await signDeclaration(declaration, signMessage, bs58.encode, (n) => declarationPrefix(n));
     } catch {
-      setError("You need to approve the signature in your wallet to list the design.");
-      setBusy(false);
+      setError("You need to approve the signature in your wallet to publish the design.");
+      setStage("idle");
       return;
     }
     const form = new FormData();
     form.append("image", file);
-    form.append("title", title);
-    form.append("price", String(usdToSol(Number(price)))); // stored in SOL for the Solana payment
-    form.append("category", category);
+    form.append("title", listing.title.trim());
+    form.append("description", listing.description.trim());
+    form.append("price", listing.price); // in the chosen currency; the server converts to SOL
+    form.append("currency", listing.currency);
+    form.append("category", listing.category);
+    form.append("style", listing.style);
+    form.append("material", listing.material);
+    form.append("isDemo", String(isDemo));
     form.append("designerWallet", publicKey.toBase58());
     form.append("agreed", String(allChecked));
     for (const [k, v] of Object.entries(signed)) form.append(k, v);
     try {
-      const res = await fetch("/api/designs", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      router.push(`/design/${data.id}`);
+      setStage("uploading");
+      setProgress(0);
+      const res = await postWithProgress("/api/designs", form, (p) => {
+        setProgress(p);
+        if (p >= 100) setStage("processing");
+      });
+      if (!res.ok || !res.data.id) throw new Error(res.data.error || "Upload failed. Please try again.");
+      setDone((d) => [...d, { id: res.data.id!, title: listing.title.trim() }]);
+      setShowSuccess(true);
+      setStage("idle");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-      setBusy(false);
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setStage("idle");
     }
   }
 
+  // ✅ Success screen after each publish
+  if (showSuccess && last) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border border-[#ece3d9] bg-white/90 p-8 text-center shadow-sm">
+        <p className="text-4xl">🎉</p>
+        <h1 className="font-serif text-3xl font-semibold text-violet-900">&ldquo;{last.title}&rdquo; is live!</h1>
+        <p className="text-stone-600">It&apos;s now in the shop and on your profile. Your other listings are untouched.</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href={`/design/${last.id}`} className="rounded-full bg-violet-700 px-6 py-3 font-semibold text-white hover:bg-violet-800">View design</Link>
+          {username && <Link href={`/u/${username}`} className="rounded-full border border-violet-300 px-6 py-3 font-semibold text-violet-800 hover:border-violet-500">My profile</Link>}
+          <button type="button" onClick={startAnother}
+            className="rounded-full border border-violet-300 px-6 py-3 font-semibold text-violet-800 hover:border-violet-500">+ Upload another design</button>
+        </div>
+        {done.length > 1 && (
+          <div className="rounded-2xl bg-stone-50 p-4 text-left text-sm">
+            <p className="mb-2 font-semibold text-stone-800">Published this session ({done.length})</p>
+            <ul className="space-y-1">
+              {done.map((d) => <li key={d.id}><Link href={`/design/${d.id}`} className="text-violet-700 underline">{d.title}</Link></li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={submit} className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2">
+    <form onSubmit={submit} className="mx-auto grid max-w-5xl gap-8 md:grid-cols-[0.9fr_1.1fr]">
       <div className="space-y-3">
-        <h1 className="text-4xl font-semibold text-violet-900">Sell a design</h1>
-        <p className="text-stone-600">It sells once. You keep the credit forever.</p>
+        <h1 className="text-4xl font-semibold text-violet-900">Upload a new design</h1>
+        <p className="text-stone-600">Each design sells once. You keep the credit forever. Add as many as you like.</p>
         <RoleNotice need="designer" action="list designs" />
-        <label className="flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-stone-300 bg-white hover:border-violet-400">
+        <label className="flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-3xl border-2 border-dashed border-violet-200 bg-white hover:border-violet-400">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="Preview" className="h-full w-full object-cover" />
+            <img src={preview} alt="Your artwork" className="h-full w-full object-contain" />
           ) : (
-            <span className="text-stone-500">Click to choose an image (max 2MB)</span>
+            <span className="px-6 text-center text-stone-500">Click to choose your artwork<br /><span className="text-xs">PNG, JPG or WebP · at least 200×200 · max 2MB</span></span>
           )}
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={busy} onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
         </label>
+        <p className="text-xs text-stone-500">🔒 Your original file stays private. Shoppers only see a watermarked preview; the buyer gets the full file after paying.</p>
       </div>
 
       <div className="space-y-5 rounded-3xl border border-[#ece3d9] bg-white/80 p-6 shadow-sm">
-        <label className="block">
-          <span className="text-sm font-medium">Title</span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Midnight Waves"
-            className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 outline-violet-500" />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm font-medium">Price (US$)</span>
-            <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="75"
-              className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 outline-violet-500" />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Made for</span>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 capitalize">
-              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </label>
-        </div>
+        <ListingFields value={listing} onChange={setListing} disabled={busy} />
 
-        <fieldset className="space-y-2 rounded-xl bg-stone-50 p-4">
-          <legend className="mb-1 text-sm font-semibold">Listing rules</legend>
+        <label className="flex gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+          <input type="checkbox" className="mt-0.5 accent-violet-600" checked={isDemo} disabled={busy} onChange={(e) => setIsDemo(e.target.checked)} />
+          <span>This is a <b>demo / test listing</b> (shown with a &ldquo;Demo&rdquo; label).</span>
+        </label>
+
+        <fieldset disabled={busy} className="space-y-2 rounded-xl bg-stone-50 p-4">
+          <legend className="mb-1 text-sm font-semibold">Seller agreement</legend>
           {CONFIRMATIONS.map((text, i) => (
             <label key={i} className="flex gap-2 text-sm">
               <input type="checkbox" className="mt-0.5 accent-violet-600" checked={checked[i]}
@@ -124,15 +190,23 @@ export default function Upload() {
 
         <DeclarationFields value={declaration} onChange={setDeclaration} disabled={busy} />
 
-        <p className="text-xs text-stone-500">
-          Not sure your design is original? Attach it to <b>💬 Ask Ownique</b> (bottom right) for a quick brand look-alike check.
-        </p>
-        {!publicKey && <p className="text-sm text-amber-700">Connect your wallet (top right) to sell.</p>}
-        {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {!publicKey && <p className="text-sm text-amber-700">Connect your wallet (top right) to publish.</p>}
+        {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+
+        {busy && (
+          <div aria-live="polite" className="space-y-1.5">
+            <div className="h-2 overflow-hidden rounded-full bg-violet-100">
+              <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400 transition-all" style={{ width: `${stage === "signing" ? 5 : stage === "processing" ? 100 : progress}%` }} />
+            </div>
+            <p className="text-xs text-stone-600">
+              {stage === "signing" ? "Approve the signature in your wallet…" : stage === "uploading" ? `Uploading… ${progress}%` : "Checking originality, making the preview and minting the ownership token…"}
+            </p>
+          </div>
+        )}
 
         <button disabled={!ready || busy}
           className="w-full rounded-full bg-violet-700 py-3 font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-40">
-          {busy ? "Listing… (sign in your wallet, then Grok writes your description ✨)" : "Sign Declaration & List Design"}
+          {busy ? "Publishing…" : "Sign Declaration & Publish Design"}
         </button>
       </div>
     </form>

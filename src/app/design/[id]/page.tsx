@@ -11,6 +11,8 @@ import ConfirmOwnership from "@/components/ConfirmOwnership";
 import { getOwnershipGate } from "@/lib/agreements";
 import { logEvent } from "@/lib/events";
 import { solText, usd } from "@/lib/price";
+import { priceLabel } from "@/lib/designOptions";
+import { getSessionAccount } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ type D = {
   imageHash?: string;
   _id: string; title: string; price: number; category: string; status: string;
   designerWallet: string; ownerWallet?: string | null; description: string; tags: string[];
-  describedByGrok: boolean; soldAt?: string | null; txSignature?: string | null; mintAddress?: string | null;
+  describedByGrok: boolean; currency?: string; style?: string; material?: string; isDemo?: boolean; soldAt?: string | null; txSignature?: string | null; mintAddress?: string | null;
   paymentMethod?: string | null; priceUsd?: number | null; tokenTransferSignature?: string | null;
 };
 
@@ -40,6 +42,8 @@ export default async function DesignPage({
   if (d.status === "hidden") notFound();
   logEvent("view", { designId: d._id });
   const gate = await getOwnershipGate(d._id);
+  const me = await getSessionAccount();
+  const canEdit = !sold && me?.role === "designer" && Boolean(me.walletAddress) && me.walletAddress === d.designerWallet;
 
   return (
     <div className="grid gap-10 md:grid-cols-2">
@@ -50,7 +54,11 @@ export default async function DesignPage({
 
       <div className="space-y-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-fuchsia-600">Made for {d.category}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-fuchsia-600">Made for {d.category}</p>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sold ? "bg-violet-900 text-white" : "bg-emerald-50 text-emerald-700"}`}>{sold ? "Sold" : "Available"}</span>
+            {d.isDemo && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Demo data</span>}
+          </div>
           <h1 className="mt-2 text-5xl font-semibold text-violet-900">{d.title}</h1>
           <p className="mt-1 text-stone-500">
             Designed by{" "}
@@ -63,6 +71,12 @@ export default async function DesignPage({
         <div className="rounded-3xl border border-[#ece3d9] bg-white/80 p-6 shadow-sm">
           <p className="leading-relaxed text-stone-700">{d.description}</p>
           {d.describedByGrok && <p className="mt-2 text-xs text-stone-400">✨ Written by Grok</p>}
+          {(d.style || d.material) && (
+            <p className="mt-3 text-sm text-stone-600 capitalize">
+              {d.style && d.style !== "other" && <>Style: <b className="font-medium text-stone-800">{d.style}</b></>}
+              {d.material && d.material !== "any" && <> · Material: <b className="font-medium text-stone-800">{d.material}</b></>}
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
             {d.tags.map((t) => (
               <span key={t} className="rounded-full bg-violet-50 px-2.5 py-1 text-xs text-violet-700">#{t}</span>
@@ -84,7 +98,10 @@ export default async function DesignPage({
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="font-serif text-4xl text-violet-900">{usd(d.price)} <span className="text-base text-stone-500">USD · paid as {solText(d.price)} on devnet</span></p>
+            <p className="font-serif text-4xl text-violet-900">{priceLabel(d.price, d.currency)} <span className="text-base text-stone-500">{d.currency === "SOL" ? `≈ ${usd(d.price)} · paid on devnet` : `USD · paid as ${solText(d.price)} on devnet`}</span></p>
+            {canEdit && (
+              <Link href={`/design/${d._id}/edit`} className="inline-block rounded-full border border-violet-300 bg-white px-5 py-2 text-sm font-semibold text-violet-800 hover:border-violet-500">✏️ Edit listing</Link>
+            )}
             <div id="buy" className="scroll-mt-24">
               {!gate.accepted ? (
                 <ConfirmOwnership designId={d._id} designerWallet={d.designerWallet} needsReaccept={gate.needsReaccept} />

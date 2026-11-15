@@ -21,12 +21,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (req.headers.get("if-none-match") === etag0) return new Response(null, { status: 304, headers: { ETag: etag0 } });
   const hit = previewCache.get(key);
   if (hit) return new Response(new Uint8Array(hit), { headers: { "Content-Type": "image/jpeg", "Cache-Control": cacheHeader, ETag: etag0 } });
+  // Previews are stored at upload; older designs get one made (and saved) on first view.
+  const stored = await Design.findById(id).select("+previewData").lean<{ previewData?: unknown }>();
+  const raw = stored?.previewData as Buffer | { buffer: Uint8Array } | null | undefined;
+  if (raw) {
+    const preview = Buffer.isBuffer(raw) ? raw : Buffer.from(raw.buffer);
+    previewCache.set(key, preview);
+    return new Response(new Uint8Array(preview), { headers: { "Content-Type": "image/jpeg", "Cache-Control": cacheHeader, ETag: etag0 } });
+  }
   const d = await loadOriginal(id);
   if (!d || d.status === "hidden") return new Response("Not found", { status: 404 });
 
   try {
     const preview = await watermark(d.bytes);
     previewCache.set(key, preview);
+    Design.updateOne({ _id: id }, { previewData: preview }).catch(() => {});
     if (previewCache.size > 60) previewCache.delete(previewCache.keys().next().value!);
     return new Response(new Uint8Array(preview), {
       headers: { "Content-Type": "image/jpeg", "Cache-Control": cacheHeader, ETag: etag0 },

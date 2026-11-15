@@ -9,6 +9,12 @@ import { hasGemini, isSameDesign } from "@/lib/gemini";
 import { logEvent } from "@/lib/events";
 import { checkDeclaration, readDeclaration, recordDeclaration } from "@/lib/agreements";
 import { getSessionAccount } from "@/lib/auth";
+import { CURRENCIES, LIMITS, MATERIALS, STYLES, type Currency } from "@/lib/designOptions";
+import { usdToSol } from "@/lib/price";
+import { watermark } from "@/lib/designImage";
+import sharp from "sharp";
+
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 const BLOCK_MESSAGE = "🚫 This design looks like one that's already owned. Sold designs can't be listed again.";
 const LOOKS_IDENTICAL = 6; // bits different out of 64 → definitely a copy
@@ -28,27 +34,43 @@ export async function GET() {
 export async function POST(req: Request) {
   if (!hasDb()) return NextResponse.json({ error: "Add MONGODB_URI to .env.local first." }, { status: 503 });
 
-  const form = await req.formData();
+  // 🔐 Designer accounts only: checked before anything else.
+  const me = await getSessionAccount();
+  if (!me) return NextResponse.json({ error: "Please log in with a Designer account to list designs." }, { status: 401 });
+  if (me.role !== "designer") return NextResponse.json({ error: "Only Designer accounts can list designs." }, { status: 403 });
+
+  const form = await req.formData().catch(() => null);
+  if (!form) return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 400 });
   const file = form.get("image");
   const title = String(form.get("title") ?? "").trim();
-  const price = Number(form.get("price"));
+  const description = String(form.get("description") ?? "").trim();
+  const currency = String(form.get("currency") ?? "USD") as Currency;
+  const listPrice = Number(form.get("price")); // in the chosen currency
   const category = String(form.get("category") ?? "other");
+  const style = String(form.get("style") ?? "other");
+  const material = String(form.get("material") ?? "any");
+  const isDemo = form.get("isDemo") === "true";
   const designerWallet = String(form.get("designerWallet") ?? "");
   const agreed = form.get("agreed") === "true";
   const declaration = readDeclaration(form, designerWallet);
 
   if (!(file instanceof File)) return NextResponse.json({ error: "Please choose an image." }, { status: 400 });
-  if (!file.type.startsWith("image/")) return NextResponse.json({ error: "File must be an image." }, { status: 400 });
+  if (!IMAGE_TYPES.includes(file.type)) return NextResponse.json({ error: "Artwork must be a PNG, JPG or WebP image." }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image must be under 2MB." }, { status: 400 });
   if (!title) return NextResponse.json({ error: "Please add a title." }, { status: 400 });
-  if (!(price > 0)) return NextResponse.json({ error: "Price must be more than $0." }, { status: 400 });
+  if (title.length > LIMITS.title) return NextResponse.json({ error: `Title must be ${LIMITS.title} characters or fewer.` }, { status: 400 });
+  if (description.length > LIMITS.description) return NextResponse.json({ error: `Description must be ${LIMITS.description} characters or fewer.` }, { status: 400 });
+  if (!CURRENCIES.includes(currency)) return NextResponse.json({ error: "Choose USD or SOL." }, { status: 400 });
+  const maxPrice = currency === "SOL" ? LIMITS.maxPriceSol : LIMITS.maxPriceUsd;
+  if (!(listPrice > 0) || listPrice > maxPrice) return NextResponse.json({ error: `Price must be more than 0 and at most ${currency === "SOL" ? `${maxPrice} SOL` : `$${maxPrice.toLocaleString()}`}.` }, { status: 400 });
+  const price = currency === "SOL" ? Math.round(listPrice * 1e6) / 1e6 : usdToSol(listPrice); // stored in SOL
+  if (!(price > 0)) return NextResponse.json({ error: "That price is too small." }, { status: 400 });
+  if (!(STYLES as readonly string[]).includes(style)) return NextResponse.json({ error: "Unknown style." }, { status: 400 });
+  if (!(MATERIALS as readonly string[]).includes(material)) return NextResponse.json({ error: "Unknown material." }, { status: 400 });
   if (!CATEGORIES.includes(category as (typeof CATEGORIES)[number]))
     return NextResponse.json({ error: "Unknown category." }, { status: 400 });
   if (!designerWallet) return NextResponse.json({ error: "Connect your wallet first." }, { status: 401 });
-  // 🔐 Only Designer accounts can list designs, using the wallet linked to their account.
-  const me = await getSessionAccount();
-  if (!me) return NextResponse.json({ error: "Please log in with a Designer account to list designs." }, { status: 401 });
-  if (me.role !== "designer") return NextResponse.json({ error: "Only Designer accounts can list designs." }, { status: 403 });
+  // 🔐 The listing must use the wallet linked to this Designer account.
   if (me.walletAddress !== designerWallet)
     return NextResponse.json({ error: "Link this wallet to your Designer account (on your profile) before listing." }, { status: 403 });
   if (!agreed) return NextResponse.json({ error: "Please agree to all the confirmations." }, { status: 400 });
@@ -59,6 +81,15 @@ export async function POST(req: Request) {
 
   await connectDb();
   const bytes = Buffer.from(await file.arrayBuffer());
+
+  // Make sure it really is a readable image (not just a renamed file) and big enough to print.
+  try {
+    const meta = await sharp(bytes).metadata();
+    if (!meta.width || !meta.height) throw new Error("no size");
+    if (meta.width < 200 || meta.height < 200) return NextResponse.json({ error: "Artwork must be at least 200×200 pixels." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "We couldn't read that image. Try a PNG or JPG." }, { status: 400 });
+  }
 
   // 🚫 Copy detector, step 1: exact same file.
   const imageHash = createHash("sha256").update(bytes).digest("hex");
@@ -103,19 +134,34 @@ export async function POST(req: Request) {
     }
   }
 
-  const grok = await describeWithGrok(title, category);
+  // Designer's own description wins; Grok only fills in when it's empty (and xAI is configured).
+  const grok = description ? { description, tags: [] as string[], byGrok: false } : await describeWithGrok(title, category);
+  const tags = [...new Set([...grok.tags, style, category].filter((t) => t && t !== "other"))].slice(0, 8);
+
+  // Watermarked public preview, made once now; the original file stays private.
+  let previewData: Buffer;
+  try {
+    previewData = await watermark(bytes);
+  } catch {
+    return NextResponse.json({ error: "We couldn't make a preview of that image. Try a PNG or JPG." }, { status: 400 });
+  }
 
   const design = await Design.create({
     title,
     price,
-    category,
+    category: category as (typeof CATEGORIES)[number],
+    currency,
+    style,
+    material,
+    isDemo,
+    previewData,
     imageData: bytes,
     imageType: file.type,
     imageHash,
     dHash: hash,
     designerWallet,
     description: grok.description,
-    tags: grok.tags,
+    tags,
     describedByGrok: grok.byGrok,
     agreedAt: new Date(),
   });

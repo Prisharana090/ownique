@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { usd } from "@/lib/price";
+import Link from "next/link";
+import { fetchMe } from "@/lib/meClient";
 
 type Row = { bucket: string; event_type: string; events: number; sol: number };
 type Stats = {
@@ -21,6 +23,8 @@ const LABELS: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const [isDesigner, setIsDesigner] = useState(false);
+  useEffect(() => { fetchMe().then((m) => setIsDesigner(m?.role === "designer")).catch(() => {}); }, []);
   const [stats, setStats] = useState<Stats | null>(null);
 
   const [stale, setStale] = useState(false);
@@ -82,7 +86,10 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-4xl font-semibold text-violet-900">📈 Live dashboard</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-4xl font-semibold text-violet-900">📈 Live dashboard</h1>
+            {isDesigner && <Link href="/upload" className="rounded-full bg-violet-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">+ Upload New Design</Link>}
+          </div>
           <p className="text-stone-600">Real-time activity, powered by Tiger Data. Updates every 5 seconds.</p>
         </div>
         <span className="flex items-center gap-2 text-sm text-emerald-700">

@@ -108,8 +108,9 @@ async function askGemini(messages: ChatMessage[], imageDataUrl?: string | null) 
   }
   const system = `${SYSTEM}\n\nWhen recommending designs, only use this live shop list. Designs marked SOLD can't be bought. Write plain text with no markdown (no asterisks, no [text](url) links). List each design on its own line as: • Title · $price · link (paste the link as-is).\n${await shopSnapshot()}`;
 
-  const models = ([process.env.GEMINI_CHAT_MODEL, "gemini-3.8-flash", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest"].filter(Boolean)) as string[]; // busy (503) models get a second try at the end
+  const models = ([process.env.GEMINI_CHAT_MODEL, "gemini-3.8-flash", "gemini-flash-lite-latest", "gemini-3.8-flash-lite", "gemini-flash-latest"].filter(Boolean)) as string[]; // busy (503) models get a second try at the end
   const errors: string[] = [];
+  let limited = false;
   for (const model of models) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15_000);
@@ -125,7 +126,7 @@ async function askGemini(messages: ChatMessage[], imageDataUrl?: string | null) 
         errors.push(`${model} ${res.status}: ${detail}`);
         console.error("Ask Ownique (Gemini) error:", model, res.status, detail);
         if (res.status === 404) continue; // model name not available for this key, try the next one
-        if (res.status === 429) return "I'm getting a lot of questions right now. Please try again in a minute! 💜";
+        if (res.status === 429) { limited = true; continue; } // this model's free quota is used up: try another model
         if (res.status === 503) await new Promise((r) => setTimeout(r, 800)); // Google busy: brief pause
         continue; // try the next model
       }
@@ -139,6 +140,7 @@ async function askGemini(messages: ChatMessage[], imageDataUrl?: string | null) 
       clearTimeout(timer);
     }
   }
+  if (limited) return "I'm getting a lot of questions right now. Please try again in a little while! 💜";
   // In local development only, show why (never includes the key) so setup problems are easy to fix.
   if (process.env.NODE_ENV === "development") return `Sorry, I can't reach Gemini right now. (dev details: ${errors.join(" | ").slice(0, 600)})`;
   return "Sorry, I can't reach my brain right now. Please try again in a moment.";

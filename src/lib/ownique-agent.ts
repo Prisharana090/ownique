@@ -156,8 +156,8 @@ function getAgent() {
         model: process.env.GEMINI_CHAT_MODEL || "gemini-3.8-flash",
         apiKey: process.env.GEMINI_API_KEY,
         temperature: 0.3,
-        maxRetries: 1,
-        timeout: 25_000,
+        maxRetries: 0, // fail fast so the plain-Gemini fallback answers quickly when quota is out
+        timeout: 20_000,
         configuration: { baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/" },
       });
   agentCache ??= createDeepAgent({

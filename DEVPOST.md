@@ -105,7 +105,7 @@ See the **Credits** section in our README for every library and service we used.
 ## Links
 - GitHub: https://github.com/Prisharana090/ownique
 - Demo video (optional, max 2 min): [YouTube link]
-- Discord usernames: [add every teammate's Discord username here]
+- Discord usernames: prisha_r [add any teammates here]
 
 ---
 

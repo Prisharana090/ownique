@@ -1,4 +1,5 @@
 "use client";
+import RoleNotice from "@/components/RoleNotice";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -74,6 +75,7 @@ export default function Upload() {
       <div className="space-y-3">
         <h1 className="text-4xl font-semibold text-violet-900">Sell a design</h1>
         <p className="text-stone-600">It sells once. You keep the credit forever.</p>
+        <RoleNotice need="designer" action="list designs" />
         <label className="flex aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-stone-300 bg-white hover:border-violet-400">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element

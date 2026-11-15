@@ -1,4 +1,5 @@
 "use client";
+import RoleNotice from "./RoleNotice";
 import { useEffect, useState } from "react";
 import bs58 from "bs58";
 import { useRouter } from "next/navigation";
@@ -135,6 +136,7 @@ export default function BuyButton(props: { designId: string; title: string; pric
         <p className="font-serif text-lg font-semibold text-violet-900">Exclusive Design Purchase Agreement</p>
         {terms && <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-[11px] font-medium text-stone-600">Version {terms.version}</span>}
       </div>
+      <RoleNotice need="buyer" action="buy designs" />
       {terms?.isDemo && (
         <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
           🧪 {terms.demoLabel} · Test purchase, no real money, never legally effective.

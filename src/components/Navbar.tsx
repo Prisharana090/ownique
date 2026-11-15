@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import MyProfileLink from "./MyProfileLink";
+import AccountMenu from "./AccountMenu";
 
 // Loaded only in the browser to avoid hydration errors.
 const WalletMultiButton = dynamic(
@@ -27,7 +27,7 @@ export default function Navbar() {
           Own<span className="italic text-fuchsia-500">ique</span>
         </Link>
         <div className="flex items-center gap-3 md:order-last">
-          <MyProfileLink />
+          <AccountMenu />
           <WalletMultiButton style={{ height: 40, borderRadius: 999, fontSize: 14, padding: "0 18px" }} />
         </div>
         {/* On phones the links become one swipeable row under the logo. */}

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Account } from "@/models/Account";
 import { connectDb, hasDb } from "@/lib/db";
 import { Design } from "@/models/Design";
 import { User } from "@/models/User";
@@ -13,6 +15,9 @@ export default async function Profile({ params }: { params: Promise<{ wallet: st
   const { wallet } = await params;
   if (!hasDb()) return <p>Add MONGODB_URI to .env.local first.</p>;
   await connectDb();
+  // Wallets linked to an Ownique account use the account profile.
+  const acc = await Account.findOne({ walletAddress: wallet }).select("username").lean<{ username: string }>();
+  if (acc) redirect(`/u/${acc.username}`);
 
   const [user, created, owned] = await Promise.all([
     User.findOne({ walletAddress: wallet }).lean<{ username?: string; verified?: boolean; createdAt?: Date }>(),

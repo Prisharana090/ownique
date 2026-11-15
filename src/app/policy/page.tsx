@@ -83,6 +83,8 @@ const privacy: Section[] = [
       "The designs you upload, with their title, price and the time you agreed to these terms.",
       "Activity like views, try-ons and sales, used only to power the live dashboard.",
       "Reports you send, so we can review them.",
+      "Your account: display name, username, role, bio and profile picture (public), plus your email (private, never shown) and a scrambled (hashed) password. We never store your password itself.",
+      "Reviews you leave after a verified purchase, shown with your username and date.",
       "Your legal name when you sign an ownership transfer declaration. It's stored privately with that agreement and never shown publicly.",
       "Try It On mockups are made in your browser, so your photo stays on your device. Only if you click Generate AI Try-On are your photo, the design's watermarked preview and your mockup sent to an AI image service (Google Gemini or Cloudflare Workers AI, depending on how the site is set up) to create the image. Ownique doesn't save them.",
       "Messages to Ask Ownique are sent to Grok (xAI) to get an answer and are not saved by Ownique.",

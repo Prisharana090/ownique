@@ -8,6 +8,7 @@ import { dHash, hammingDistance } from "@/lib/imageHash";
 import { hasGemini, isSameDesign } from "@/lib/gemini";
 import { logEvent } from "@/lib/events";
 import { checkDeclaration, readDeclaration, recordDeclaration } from "@/lib/agreements";
+import { getSessionAccount } from "@/lib/auth";
 
 const BLOCK_MESSAGE = "🚫 This design looks like one that's already owned. Sold designs can't be listed again.";
 const LOOKS_IDENTICAL = 6; // bits different out of 64 → definitely a copy
@@ -44,6 +45,12 @@ export async function POST(req: Request) {
   if (!CATEGORIES.includes(category as (typeof CATEGORIES)[number]))
     return NextResponse.json({ error: "Unknown category." }, { status: 400 });
   if (!designerWallet) return NextResponse.json({ error: "Connect your wallet first." }, { status: 401 });
+  // 🔐 Only Designer accounts can list designs, using the wallet linked to their account.
+  const me = await getSessionAccount();
+  if (!me) return NextResponse.json({ error: "Please log in with a Designer account to list designs." }, { status: 401 });
+  if (me.role !== "designer") return NextResponse.json({ error: "Only Designer accounts can list designs." }, { status: 403 });
+  if (me.walletAddress !== designerWallet)
+    return NextResponse.json({ error: "Link this wallet to your Designer account (on your profile) before listing." }, { status: 403 });
   if (!agreed) return NextResponse.json({ error: "Please agree to all the confirmations." }, { status: 400 });
   // ✍️ Designer Ownership Transfer Declaration: legal name + review + accept + authority, signed with the wallet
   // (so nobody can list designs in someone else's name, and the acceptance is tied to this exact wording).

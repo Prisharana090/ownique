@@ -24,7 +24,7 @@ Built at **HackPrinceton Fall 2026** (Business & Enterprise track).
 - **Certificate of Creation:** a printable proof page for every design (creator, time, file fingerprint, Solana token, owner)
 - **Designer profiles:** every design a designer ever made, credited forever, plus what they own
 - **Pay with bank (Capital One Nessie):** buyers can pay the designer from a practice bank account instead of crypto; ownership still moves on Solana
-- **Ask Ownique:** a LangChain **Deep Agent** (powered by Grok) that searches the shop, reads ownership records and our terms, shows live stats, and checks attached designs for brand / character look-alikes
+- **Ask Ownique:** a LangChain **Deep Agent** (running on Gemini; Grok if an xAI key is set) that searches the shop, reads ownership records and our terms, shows live stats, and checks attached designs for brand / character look-alikes
 - **Copyright, trademark & privacy terms** in plain language
 - **Report button:** hides a reported design while it's reviewed (reports stored in MongoDB)
 - **Grok Bot:** a GitHub Action that asks Grok to summarize every push into `CHANGELOG.md` (and Discord)

@@ -3,7 +3,7 @@ import "server-only";
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
 // Text + vision models, tried in order (Gemini sometimes reports "high demand" on one model).
-const TEXT_MODELS = [process.env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.8-flash"].filter(
+const TEXT_MODELS = [process.env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest"].filter(
   (m, i, a): m is string => Boolean(m) && a.indexOf(m) === i
 );
 

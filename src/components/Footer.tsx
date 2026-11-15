@@ -19,6 +19,7 @@ export default function Footer() {
         </div>
         <div className="space-y-1.5">
           <p className="font-semibold text-stone-800">Trust</p>
+          <Link href="/policy" className="block hover:text-violet-700">How it works &amp; terms</Link>
           <Link href="/policy#designers" className="block hover:text-violet-700">How ownership works</Link>
           <Link href="/policy#copyright" className="block hover:text-violet-700">Copyright &amp; trademarks</Link>
           <Link href="/policy#privacy" className="block hover:text-violet-700">Privacy</Link>

@@ -11,11 +11,10 @@ const WalletMultiButton = dynamic(
 
 const links = [
   { href: "/shop", label: "Shop" },
-  { href: "/upload", label: "Sell a design" },
+  { href: "/upload", label: "Sell" },
   { href: "/try-on", label: "Try It On" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/agreements", label: "My Agreements" },
-  { href: "/policy", label: "How it works & terms" },
+  { href: "/agreements", label: "Agreements" },
 ];
 
 export default function Navbar() {

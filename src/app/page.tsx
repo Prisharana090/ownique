@@ -10,17 +10,17 @@ const steps = [
   {
     n: "01",
     title: "A designer lists it",
-    text: "They sign an originality agreement with their wallet. A one-of-a-kind ownership token is created on Solana, with their name on it forever.",
+    text: "They sign an originality agreement. A one-of-a-kind ownership token is created on Solana with their name on it.",
   },
   {
     n: "02",
     title: "A buyer makes it theirs",
-    text: "Try it on your own product, then pay with SOL or by bank. Ownership moves to you, and only you get the full-quality file.",
+    text: "Try it on your own product, then buy it. Ownership moves to you, and only you get the full-quality file.",
   },
   {
     n: "03",
     title: "It can never be sold again",
-    text: "Copies, even resized or edited ones, are blocked. The creator keeps the credit, and every design gets a Certificate of Creation.",
+    text: "Copies are blocked, and the creator keeps the credit forever.",
   },
 ];
 
@@ -31,7 +31,7 @@ const promises = [
   ["™️", "Brand check", "Ask Ownique flags designs that look like famous logos."],
 ];
 
-const builtWith = ["Solana", "MongoDB Atlas", "Tiger Data", "Gemini", "Grok", "LangChain", "Capital One Nessie"];
+const builtWith = ["Solana", "MongoDB Atlas", "Tiger Data", "Gemini", "LangChain", "Capital One Nessie"];
 
 async function getHomeData() {
   if (!hasDb()) return { featured: [] as DesignSummary[], listed: 0, sold: 0, designers: 0 };
@@ -40,7 +40,7 @@ async function getHomeData() {
     Design.find({ status: "listed" }).sort({ createdAt: -1 }).limit(4).lean(),
     Design.countDocuments({ status: "listed" }),
     Design.countDocuments({ status: "sold" }),
-    Design.distinct("designerWallet").then((d) => d.length),
+    Design.distinct("designerWallet", { status: { $ne: "hidden" } }).then((d) => d.length),
   ]);
   return { featured: await withOwnershipStatus(JSON.parse(JSON.stringify(docs)) as DesignSummary[]), listed, sold, designers };
 }

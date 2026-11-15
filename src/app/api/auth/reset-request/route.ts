@@ -37,6 +37,8 @@ export async function POST(req: Request) {
   } else if (process.env.NODE_ENV === "development") {
     // Local development without an email service only: print the link so the flow can be tested.
     console.info(`[Ownique] (dev only, email not configured) Password reset link: ${link}`);
+    // Also keep it in a gitignored local file so the flow can be tested without reading the terminal.
+    await import("fs/promises").then((fs) => fs.appendFile(".dev-reset-links.txt", `${new Date().toISOString()} ${a.email} ${link}\n`)).catch(() => {});
   } else {
     console.error("[Ownique] Password reset not sent: email service not configured.");
   }

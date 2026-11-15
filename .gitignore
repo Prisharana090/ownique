@@ -43,3 +43,6 @@ next-env.d.ts
 
 # local sample artwork (not committed)
 /.seed-images/
+
+# dev-only password reset links (never committed)
+/.dev-reset-links.txt

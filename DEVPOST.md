@@ -77,7 +77,9 @@ Ownique is a design marketplace where **every design sells exactly once**.
 - Everything runs on Solana **devnet**: no real money moves. Agreements are clearly marked as records pending legal review, not legal advice.
 
 ## Challenges we ran into
-[Write 2–3 real ones, e.g. making sure a design can only ever sell once even with simultaneous clicks; getting the AI agent to work on Gemini's free tier (thought signatures, quotas); clipping Try It On designs to the real printable area of a product.]
+- **Selling a design only once, for real.** Two buyers clicking at the same moment, or one person double-clicking, must never create two sales. We made every sale and transfer a single all-or-nothing database update with all the rules inside it, and tested it with 12 simultaneous clicks: exactly one transfer.
+- **Making AI work on a free tier.** Our agent first ran on Grok, then we moved it to Gemini's free tier. Newer Gemini models require a "thought signature" with every tool call, which a generic connector dropped, and free quotas ran out mid-testing. We switched to LangChain's official Google integration and added automatic fallback between models.
+- **Keeping designs on the product.** In Try It On, artwork spilled past the edges of mugs and shirts. We added automatic detection of the printable area, clipping, and perspective/cylinder warping so the design looks printed, not pasted.
 
 ## Accomplishments we're proud of
 - A full buy flow where ownership really moves on-chain, and can only happen once.
@@ -85,7 +87,10 @@ Ownique is a design marketplace where **every design sells exactly once**.
 - Try It On makes buying a design feel like shopping for a real product.
 
 ## What we learned
-[e.g. how Solana transactions are verified, how AI agents decide which tools to use, how time-series data powers live dashboards.]
+- How to verify a Solana payment on the server and mint and transfer a 1-of-1 ownership token from a vault wallet.
+- How AI agents decide which tools to call, and how to give them small, safe, read-only tools over real data.
+- How to design legal-style records responsibly: versioned agreements, both parties accepting the same text, tamper-proof storage, and clearly labeling what is a demo and what isn't legal advice.
+- How time-series data (Tiger Data hypertables and continuous aggregates) powers a live dashboard.
 
 ## What's next
 - Pay with bank (Capital One Nessie), already built, needs keys

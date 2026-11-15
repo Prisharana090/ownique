@@ -1,6 +1,7 @@
 "use client";
 // Live dashboard powered by Tiger Data (refreshes every 5 seconds).
 import { useEffect, useState } from "react";
+import DemoMode from "@/components/DemoMode";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { usd } from "@/lib/price";
 import Link from "next/link";
@@ -22,7 +23,7 @@ const LABELS: Record<string, string> = {
   view: "Views", try_on: "Try-ons", purchase: "Sales", upload: "Uploads", blocked_upload: "Copies blocked", report: "Reports",
 };
 
-export default function Dashboard() {
+function LiveStats() {
   const [isDesigner, setIsDesigner] = useState(false);
   useEffect(() => { fetchMe().then((m) => setIsDesigner(m?.role === "designer")).catch(() => {}); }, []);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -139,6 +140,18 @@ export default function Dashboard() {
           </ol>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Designer dashboard: live marketplace stats, plus Demo Mode (sample order & ownership transfer) for designers. */
+export default function Dashboard() {
+  const [isDesigner, setIsDesigner] = useState(false);
+  useEffect(() => { fetchMe().then((m) => setIsDesigner(m?.role === "designer")).catch(() => {}); }, []);
+  return (
+    <div className="space-y-12">
+      <LiveStats />
+      {isDesigner && <DemoMode />}
     </div>
   );
 }
